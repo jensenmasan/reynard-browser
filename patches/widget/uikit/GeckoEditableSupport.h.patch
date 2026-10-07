@@ -1,9 +1,9 @@
 diff --git a/widget/uikit/GeckoEditableSupport.h b/widget/uikit/GeckoEditableSupport.h
 new file mode 100644
-index 000000000000..99a26c6bf938
+index 000000000000..597b4d9998e0
 --- /dev/null
 +++ b/widget/uikit/GeckoEditableSupport.h
-@@ -0,0 +1,156 @@
+@@ -0,0 +1,163 @@
 +/* This Source Code Form is subject to the terms of the Mozilla Public
 + * License, v. 2.0. If a copy of the MPL was not distributed with this
 + * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
@@ -93,12 +93,19 @@ index 000000000000..99a26c6bf938
 +      static_cast<int32_t>(std::lround(aPoint.y * aBackingScale)));
 +}
 +
-+inline CGRect DevPixelsToUIKitPoints(const mozilla::LayoutDeviceIntRect& aRect,
++inline CGRect DevPixelsToUIKitPoints(const mozilla::LayoutDeviceRect& aRect,
 +                                     CGFloat aBackingScale) {
 +  return CGRectMake((CGFloat)aRect.x / aBackingScale,
 +                    (CGFloat)aRect.y / aBackingScale,
 +                    (CGFloat)aRect.width / aBackingScale,
 +                    (CGFloat)aRect.height / aBackingScale);
++}
++
++inline CGRect DevPixelsToUIKitPoints(const mozilla::LayoutDeviceIntRect& aRect,
++                                     CGFloat aBackingScale) {
++  return DevPixelsToUIKitPoints(
++      mozilla::LayoutDeviceRect(aRect.x, aRect.y, aRect.width, aRect.height),
++      aBackingScale);
 +}
 +
 +// MARK: - Geometry Utilities

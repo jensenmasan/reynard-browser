@@ -1,9 +1,9 @@
 diff --git a/widget/uikit/GeckoEditableSupport.mm b/widget/uikit/GeckoEditableSupport.mm
 new file mode 100644
-index 000000000000..1dcdd568e0ce
+index 000000000000..3bca48ae20a6
 --- /dev/null
 +++ b/widget/uikit/GeckoEditableSupport.mm
-@@ -0,0 +1,3411 @@
+@@ -0,0 +1,3603 @@
 +/* This Source Code Form is subject to the terms of the Mozilla Public
 + * License, v. 2.0. If a copy of the MPL was not distributed with this
 + * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
@@ -22,19 +22,24 @@ index 000000000000..1dcdd568e0ce
 +#include "UIKitUtils.h"
 +#include "nsWindow.h"
 +
++#include "ipc/nsGUIEventIPC.h"
 +#include "mozilla/AutoRestore.h"
++#include "mozilla/CheckedInt.h"
 +#include "mozilla/EventForwards.h"
 +#include "mozilla/MacStringHelpers.h"
 +#include "mozilla/MiscEvents.h"
 +#include "mozilla/TextEvents.h"
 +#include "mozilla/TextRange.h"
 +#include "mozilla/dom/BrowserParent.h"
++#include "mozilla/layers/CompositorSession.h"
 +#include "nsIURI.h"
 +#include "nsIWidget.h"
 +#include "nsString.h"
 +
 +using namespace mozilla;
 +using namespace mozilla::widget;
++using mozilla::layers::ScrollableLayerGuid;
++using mozilla::layers::UiCompositorControllerChild;
 +using mozilla::widget::UIKitUtils;
 +
 +@class UITextInputArrowKeyHistory;
@@ -146,8 +151,6 @@ index 000000000000..1dcdd568e0ce
 +- (void)activateSelection;
 +- (void)deactivateSelection;
 +- (void)selectionChanged;
-+- (void)willStartScrollingOrZooming;
-+- (void)didEndScrollingOrZooming;
 +- (void)selectAll:(id)aSender;
 +- (void)showSelectionCommandsForSecondaryClickAtPoint:(CGPoint)aPoint;
 +- (void)beginFloatingCursorAtPoint:(CGPoint)aPoint;
@@ -178,6 +181,7 @@ index 000000000000..1dcdd568e0ce
 +- (void)asyncScrollStateChanged:(BOOL)aScrolling;
 +- (void)selectionGeometryChanged;
 +- (void)applySelectionGeometryChange;
++- (void)refreshCompositorSelection;
 +- (void)setSelectionHandlesVisible:(BOOL)aVisible;
 +- (CGRect)_selectionClipRect;
 +- (BOOL)isInteractingWithText;
@@ -370,31 +374,41 @@ index 000000000000..1dcdd568e0ce
 +  RefPtr<TextInputHandler> self(this);
 +  const uint64_t focusGeneration = mNativeTextInputFocusGeneration;
 +
-+  LayoutDeviceIntRect cachedRect;
 +  bool hasCachedGeometry = false;
-+  if (aRequest.mQuery == NativeTextInputQuery::Caret && mNativeTextInputState &&
-+      !mNativeTextInputStateDirty) {
-+    const bool atInsertionPoint =
-+        !mNativeTextInputState->mSelectionLength &&
-+        mNativeTextInputState->mSelectionStart == aRequest.mOffset;
-+    const bool affinityMatches = mNativeTextInputState->mAssociateWithNext ==
-+                                 aRequest.mAssociateWithNext;
-+
-+    if (atInsertionPoint && affinityMatches) {
-+      // Use the cached caret rect during blinking and layout so UIKit doesn't
-+      // have to wait for content.
-+      hasCachedGeometry =
-+          browser->GetCachedCaretRect(aRequest.mOffset, cachedRect);
-+    }
-+  }
-+
-+  if (hasCachedGeometry) {
++  const bool geometryQuery =
++      aRequest.mQuery == NativeTextInputQuery::Caret ||
++      aRequest.mQuery == NativeTextInputQuery::SelectionHighlightRects;
++  if (geometryQuery && mNativeTextInputState && !mNativeTextInputStateDirty) {
 +    aReply = NativeTextInputReply();
 +    aReply.mSucceeded = true;
 +    aReply.mEditable = true;
-+    aReply.mRect = cachedRect;
-+  } else if (!browser->QueryNativeTextInput(aRequest, aReply)) {
-+    return false;
++
++    if (aRequest.mQuery == NativeTextInputQuery::Caret) {
++      for (const auto& caret : mNativeTextInputState->mCaretRects) {
++        if (caret.mStartOffset == aRequest.mOffset &&
++            caret.mAssociateWithNext == aRequest.mAssociateWithNext) {
++          aReply.mRect = caret.mRect;
++          aReply.mRTL = caret.mRTL;
++          aReply.mScrollReferences = caret.mScrollReferences.Clone();
++          hasCachedGeometry = true;
++          break;
++        }
++      }
++    } else if (aRequest.mOffset == mNativeTextInputState->mSelectionStart &&
++               aRequest.mLength == mNativeTextInputState->mSelectionLength) {
++      aReply.mRects = mNativeTextInputState->mRects.Clone();
++      hasCachedGeometry = true;
++    }
++  }
++
++  if (!hasCachedGeometry) {
++    if (mUpdatingSelectionFromCompositor) {
++      return false;
++    }
++
++    if (!browser->QueryNativeTextInput(aRequest, aReply)) {
++      return false;
++    }
 +  }
 +
 +  if (aRequest.mQuery == NativeTextInputQuery::BlurFocusedInput) {
@@ -421,6 +435,10 @@ index 000000000000..1dcdd568e0ce
 +      [view cancelAutoscroll];
 +      view->mEditable.mFloatingCursorActive = NO;
 +    }
++
++    if (!mWidget->GetInputContext().mIMEState.IsEditable()) {
++      mWidget->SetNativeTextInputScrollers({});
++    }
 +  }
 +
 +  mNativeTextInputStateDirty = true;
@@ -431,22 +449,13 @@ index 000000000000..1dcdd568e0ce
 +  mNativeTextInputGeometryDirty = true;
 +}
 +
-+void TextInputHandler::UpdateSelectionScrollState() {
-+  RefPtr<TextInputHandler> self(this);
-+  if (Destroyed()) {
-+    return;
-+  }
-+
-+  ChildView* view =
-+      static_cast<ChildView*>(mWidget->GetNativeData(NS_NATIVE_WIDGET));
-+  const bool scrolling =
-+      mNativeTextInputState &&
-+      mWidget->IsAsyncScrolling(mNativeTextInputState->mSelectionScrollers);
-+  [view asyncScrollStateChanged:scrolling];
-+}
-+
 +const NativeTextInputReply* TextInputHandler::NativeTextInputState() {
 +  RefPtr<TextInputHandler> self(this);
++  if (mUpdatingSelectionFromCompositor) {
++    return mNativeTextInputState.isSome() ? &mNativeTextInputState.ref()
++                                          : nullptr;
++  }
++
 +  if (mNativeTextInputStateDirty && !mSynchronizingNativeTextInputState) {
 +    if (!SynchronizeTextInputState(true)) {
 +      return nullptr;
@@ -455,12 +464,19 @@ index 000000000000..1dcdd568e0ce
 +
 +  if (mNativeTextInputState && mNativeTextInputGeometryDirty &&
 +      !mSynchronizingNativeTextInputState) {
++    if (mWidget->IsAsyncScrolling(mNativeTextInputState->mSelectionScrollers)) {
++      return &mNativeTextInputState.ref();
++    }
++
 +    AutoRestore<bool> synchronizing(mSynchronizingNativeTextInputState);
 +    mSynchronizingNativeTextInputState = true;
 +
 +    NativeTextInputRequest request;
 +    request.mQuery = NativeTextInputQuery::Appearance;
++    request.mOffset = mNativeTextInputState->mSelectionStart;
++    request.mLength = mNativeTextInputState->mSelectionLength;
 +    NativeTextInputReply reply;
++
 +    if (!QueryNativeTextInput(request, reply) || !mNativeTextInputState) {
 +      return nullptr;
 +    }
@@ -472,6 +488,11 @@ index 000000000000..1dcdd568e0ce
 +        reply.mSuppressSelectionDisplay;
 +    mNativeTextInputState->mSelectionScrollers =
 +        std::move(reply.mSelectionScrollers);
++    mNativeTextInputState->mScrollReferences =
++        std::move(reply.mScrollReferences);
++    mNativeTextInputState->mClipRects = std::move(reply.mClipRects);
++    mNativeTextInputState->mCaretRects = std::move(reply.mCaretRects);
++    mNativeTextInputState->mRects = std::move(reply.mRects);
 +    mNativeTextInputGeometryDirty = false;
 +    UpdateSelectionScrollState();
 +    if (Destroyed()) {
@@ -718,15 +739,52 @@ index 000000000000..1dcdd568e0ce
 +  return QueryNativeTextInput(request, reply) && SynchronizeTextInputState();
 +}
 +
-+bool TextInputHandler::EditorRect(LayoutDeviceIntRect& aRect) {
++LayoutDeviceRect TextInputHandler::TransformSelectionRect(
++    const LayoutDeviceIntRect& aRect,
++    const nsTArray<NativeTextInputScrollReference>& aReferences) const {
++  LayoutDevicePoint translation;
++  LayoutDevicePoint origin;
++  float zoom = 1.0f;
++  for (const auto& reference : aReferences) {
++    const auto* update =
++        mWidget->GetNativeTextInputScrollUpdate(reference.mGuid);
++    if (!update) {
++      continue;
++    }
++    const CSSPoint offset = reference.mFixed
++                                ? update->mVisualOffset - update->mLayoutOffset
++                                : update->mVisualOffset;
++    const CSSPoint delta = offset - reference.mOffset;
++    translation -=
++        reference.mXAxis * float(delta.x) + reference.mYAxis * float(delta.y);
++
++    if (reference.mZoom > 0.0f) {
++      zoom = update->mZoom / reference.mZoom;
++      origin = reference.mOrigin;
++    }
++  }
++
++  const LayoutDeviceRect rect(aRect.x, aRect.y, aRect.width, aRect.height);
++
++  return LayoutDeviceRect(
++      origin + (rect.TopLeft() - origin + translation) * zoom,
++      rect.Size() * zoom);
++}
++
++bool TextInputHandler::EditorRect(LayoutDeviceRect& aRect) {
 +  RefPtr<TextInputHandler> self(this);
 +  const NativeTextInputReply* state = NativeTextInputState();
 +  if (!state) {
 +    return false;
 +  }
 +
-+  aRect = state->mRect;
-+  return !aRect.IsEmpty();
++  aRect = TransformSelectionRect(state->mRect, state->mScrollReferences);
++  for (const auto& clip : state->mClipRects) {
++    aRect = aRect.Intersect(
++        TransformSelectionRect(clip.mRect, clip.mScrollReferences));
++  }
++
++  return true;
 +}
 +
 +bool TextInputHandler::RunCommand(EventMessage aMessage, bool aOnlyEnabledCheck,
@@ -750,7 +808,137 @@ index 000000000000..1dcdd568e0ce
 +  return aOnlyEnabledCheck || SynchronizeTextInputState();
 +}
 +
++// MARK: - Selection Scrolling
++
++bool TextInputHandler::SelectionUsesScroller(
++    const layers::ScrollableLayerGuid& aGuid) const {
++  return mNativeTextInputState &&
++         mNativeTextInputState->mSelectionScrollers.Contains(aGuid);
++}
++
++void TextInputHandler::UpdateSelectionScrollState(bool aSelectionMoved) {
++  RefPtr<TextInputHandler> self(this);
++  if (Destroyed()) {
++    return;
++  }
++
++  ChildView* view =
++      static_cast<ChildView*>(mWidget->GetNativeData(NS_NATIVE_WIDGET));
++  const bool scrolling =
++      mNativeTextInputState &&
++      mWidget->IsAsyncScrolling(mNativeTextInputState->mSelectionScrollers);
++  AutoRestore<bool> updating(mUpdatingSelectionFromCompositor);
++  mUpdatingSelectionFromCompositor |= aSelectionMoved;
++  [view asyncScrollStateChanged:scrolling];
++
++  if (!aSelectionMoved) {
++    if (mNativeTextInputState && view->mEditable.mSelectionActivated) {
++      if ([view isFirstResponder] &&
++          !mNativeTextInputState->mSuppressSelectionDisplay) {
++        mWidget->SetNativeTextInputScrollers(
++            mNativeTextInputState->mSelectionScrollers);
++      } else {
++        mWidget->SetNativeTextInputScrollers({});
++      }
++    }
++    return;
++  }
++
++  if (mNativeTextInputState && !mNativeTextInputStateDirty) {
++    [view refreshCompositorSelection];
++  }
++}
++
 +}  // namespace mozilla::widget
++
++// MARK: - Compositor Frame Delivery
++
++void nsWindow::SetNativeTextInputScrollers(
++    const nsTArray<ScrollableLayerGuid>& aScrollers) {
++  if (!mCompositorSession) {
++    return;
++  }
++
++  RefPtr<UiCompositorControllerChild> controller =
++      mCompositorSession->GetUiCompositorControllerChild();
++  if (!controller || controller->GetNativeTextInputScrollers() == aScrollers) {
++    return;
++  }
++
++  mNativeTextInputScrollUpdates.Clear();
++  controller->SetNativeTextInputScrollers(aScrollers);
++}
++
++void nsWindow::OnUiCompositorControllerOpen() {
++  [mNativeView updateSelectionActivation];
++}
++
++void nsWindow::NotifyNativeTextInputScrollUpdates(
++    mozilla::ipc::ByteBuf&& aData) {
++  const CheckedInt<int> length(aData.mLen);
++  if (!length.isValid() || length.value() < IPC::Message::HeaderSize()) {
++    return;
++  }
++
++  const char* bytes = reinterpret_cast<const char*>(aData.mData);
++  if (IPC::Message::MessageSize(bytes, bytes + aData.mLen) != aData.mLen) {
++    return;
++  }
++
++  IPC::Message message(bytes, length.value());
++  IPC::MessageReader reader(message);
++  nsTArray<NativeTextInputScrollUpdate> updates;
++  if (!IPC::ReadParam(&reader, &updates)) {
++    return;
++  }
++
++  bool selectionMoved = false;
++  if (mTextInputHandler) {
++    auto hasChangedSelectionScroller = [&](const auto& aCurrent,
++                                           const auto& aPrevious) {
++      for (const auto& update : aCurrent) {
++        if (!mTextInputHandler->SelectionUsesScroller(update.mGuid)) {
++          continue;
++        }
++
++        if (!aPrevious.Contains(update)) {
++          return true;
++        }
++      }
++      return false;
++    };
++
++    selectionMoved =
++        hasChangedSelectionScroller(updates, mNativeTextInputScrollUpdates) ||
++        hasChangedSelectionScroller(mNativeTextInputScrollUpdates, updates);
++  }
++
++  mNativeTextInputScrollUpdates = std::move(updates);
++  if (selectionMoved) {
++    mTextInputHandler->UpdateSelectionScrollState(true);
++  }
++}
++
++const NativeTextInputScrollUpdate* nsWindow::GetNativeTextInputScrollUpdate(
++    const ScrollableLayerGuid& aGuid) const {
++  for (const auto& update : mNativeTextInputScrollUpdates) {
++    if (update.mGuid == aGuid) {
++      return &update;
++    }
++  }
++  return nullptr;
++}
++
++bool nsWindow::IsAsyncScrolling(
++    const nsTArray<ScrollableLayerGuid>& aScrollers) const {
++  for (const auto& scroller : aScrollers) {
++    const auto* update = GetNativeTextInputScrollUpdate(scroller);
++    if (update && update->mScrolling) {
++      return true;
++    }
++  }
++  return false;
++}
 +
 +namespace {
 +
@@ -1310,10 +1498,6 @@ index 000000000000..1dcdd568e0ce
 +}
 +
 +- (void)updateSelectionActivation {
-+  if (mEditable.mAsyncScrollInProgress && [self isEditable]) {
-+    return;
-+  }
-+
 +  id<GeckoTextInteractionAssistant> assistant = [self interactionAssistant];
 +  BOOL dragging = mEditable.mTextDragSession || mEditable.mTextDropSession;
 +  BOOL shouldActivate = !dragging && [self isEditable];
@@ -1321,11 +1505,19 @@ index 000000000000..1dcdd568e0ce
 +    shouldActivate = [self isFirstResponder] && self.selectedTextRange;
 +  }
 +
++  const NativeTextInputReply* state = nullptr;
 +  if (shouldActivate) {
 +    RefPtr<widget::TextInputHandler> handler = [self textHandler];
-+    const NativeTextInputReply* state =
-+        handler ? handler->NativeTextInputState() : nullptr;
++    state = handler ? handler->NativeTextInputState() : nullptr;
 +    shouldActivate = state && !state->mSuppressSelectionDisplay;
++  }
++
++  if (mGeckoChild) {
++    if (shouldActivate) {
++      mGeckoChild->SetNativeTextInputScrollers(state->mSelectionScrollers);
++    } else {
++      mGeckoChild->SetNativeTextInputScrollers({});
++    }
 +  }
 +
 +  if (@available(iOS 17.0, *)) {
@@ -1356,7 +1548,7 @@ index 000000000000..1dcdd568e0ce
 +}
 +
 +- (void)refreshSelectionUI {
-+  if (![self isEditable] || mEditable.mAsyncScrollInProgress) {
++  if (![self isEditable]) {
 +    return;
 +  }
 +
@@ -1416,40 +1608,25 @@ index 000000000000..1dcdd568e0ce
 +    return;
 +  }
 +
++  mEditable.mAsyncScrollInProgress = aScrolling;
 +  if (aScrolling) {
-+    if (![self isEditable] || ![self isFirstResponder]) {
-+      return;
-+    }
-+
-+    if ([self isInteractingWithText]) {
-+      return;
-+    }
-+
-+    mEditable.mAsyncScrollInProgress = YES;
-+    id<GeckoTextInteractionAssistant> assistant = [self interactionAssistant];
-+    [assistant willStartScrollingOrZooming];
-+    [assistant deactivateSelection];
-+    mEditable.mSelectionActivated = NO;
-+
-+    if (@available(iOS 17.0, *)) {
-+      [(UITextSelectionDisplayInteraction*)[self _selectionDisplayInteraction]
-+          setActivated:NO];
++    if ([self isEditable] && [self isFirstResponder] &&
++        ![self isInteractingWithText]) {
++      [[self selectionCommandController] hideSelectionCommands];
 +    }
 +
 +    return;
 +  }
 +
-+  mEditable.mAsyncScrollInProgress = NO;
 +  if (RefPtr<widget::TextInputHandler> handler = [self textHandler]) {
 +    handler->InvalidateTextInputGeometry();
 +  }
 +
 +  [self refreshSelectionUI];
-+  [[self interactionAssistant] didEndScrollingOrZooming];
 +}
 +
 +- (void)selectionGeometryChanged {
-+  if (![self isEditable] || mEditable.mAsyncScrollInProgress) {
++  if (![self isEditable]) {
 +    return;
 +  }
 +
@@ -1471,15 +1648,26 @@ index 000000000000..1dcdd568e0ce
 +    return;
 +  }
 +
-+  if (mEditable.mAsyncScrollInProgress) {
-+    return;
-+  }
-+
 +  if (RefPtr<widget::TextInputHandler> handler = [self textHandler]) {
 +    handler->NativeTextInputState();
 +  }
 +
 +  [self refreshSelectionUI];
++}
++
++- (void)refreshCompositorSelection {
++  if (![self isEditable] || ![self isFirstResponder]) {
++    return;
++  }
++
++  if (@available(iOS 17.0, *)) {
++    UITextSelectionDisplayInteraction* display =
++        [self _selectionDisplayInteraction];
++    [display layoutManagedSubviews];
++  } else {
++    [(id<GeckoTextSelectionView>)[[self interactionAssistant] textSelectionView]
++        updateSelectionRects];
++  }
 +}
 +
 +- (void)setSelectionHandlesVisible:(BOOL)aVisible {
@@ -2580,7 +2768,7 @@ index 000000000000..1dcdd568e0ce
 +- (CGRect)_selectionClipRect {
 +  CGRect bounds = self.bounds;
 +  RefPtr<widget::TextInputHandler> handler = [self textHandler];
-+  LayoutDeviceIntRect editor;
++  LayoutDeviceRect editor;
 +  if (handler && handler->EditorRect(editor)) {
 +    bounds = CGRectIntersection(
 +        bounds, DevPixelsToUIKitPoints(editor, self.contentScaleFactor));
@@ -2605,7 +2793,9 @@ index 000000000000..1dcdd568e0ce
 +    return CGRectZero;
 +  }
 +
-+  CGRect rect = DevPixelsToUIKitPoints(reply.mRect, self.contentScaleFactor);
++  CGRect rect = DevPixelsToUIKitPoints(
++      handler->TransformSelectionRect(reply.mRect, reply.mScrollReferences),
++      self.contentScaleFactor);
 +  if (@available(iOS 17.0, *)) {
 +    return rect;
 +  }
@@ -2638,11 +2828,13 @@ index 000000000000..1dcdd568e0ce
 +  NSMutableArray<UITextSelectionRect*>* rects =
 +      [NSMutableArray arrayWithCapacity:reply.mRects.Length()];
 +  for (const auto& rect : reply.mRects) {
-+    ChildViewTextSelectionRect* result = [ChildViewTextSelectionRect
-+        selectionRectWithRect:DevPixelsToUIKitPoints(rect.mRect,
-+                                                     self.contentScaleFactor)
-+                containsStart:rect.mContainsStart
-+                  containsEnd:rect.mContainsEnd];
++    CGRect highlight = DevPixelsToUIKitPoints(
++        handler->TransformSelectionRect(rect.mRect, rect.mScrollReferences),
++        self.contentScaleFactor);
++    ChildViewTextSelectionRect* result =
++        [ChildViewTextSelectionRect selectionRectWithRect:highlight
++                                            containsStart:rect.mContainsStart
++                                              containsEnd:rect.mContainsEnd];
 +    result.writingDirectionValue = rect.mRTL ? NSWritingDirectionRightToLeft
 +                                             : NSWritingDirectionLeftToRight;
 +    result.verticalValue = rect.mVertical;

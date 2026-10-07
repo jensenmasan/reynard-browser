@@ -1,5 +1,5 @@
 diff --git a/gfx/layers/ipc/PUiCompositorController.ipdl b/gfx/layers/ipc/PUiCompositorController.ipdl
-index ddae7c999256..7aa904d84be4 100644
+index ddae7c999256..3f9fe727b797 100644
 --- a/gfx/layers/ipc/PUiCompositorController.ipdl
 +++ b/gfx/layers/ipc/PUiCompositorController.ipdl
 @@ -4,6 +4,7 @@
@@ -10,7 +10,7 @@ index ddae7c999256..7aa904d84be4 100644
  
  include "mozilla/GfxMessageUtils.h";
  include "mozilla/layers/LayersMessageUtils.h";
-@@ -30,7 +31,8 @@ parent:
+@@ -30,11 +31,13 @@ parent:
  
    async InvalidateAndRender();
    async MaxToolbarHeight(int32_t aHeight);
@@ -20,11 +20,8 @@ index ddae7c999256..7aa904d84be4 100644
    async DefaultClearColor(uint32_t aColor);
    async RequestScreenPixels(uint64_t aRequestId, IntRect aSourceRect,
                              FileDescriptor aHardwareBuffer);
-@@ -38,6 +40,7 @@ parent:
+   async EnableLayerUpdateNotifications(bool aEnable);
++  async NativeTextInputScrollers(ScrollableLayerGuid[] aScrollers);
  child:
    async ToolbarAnimatorMessageFromCompositor(int32_t aMessage);
    async NotifyCompositorScrollUpdates(CompositorScrollUpdate[] aUpdates);
-+  async AsyncScrollStateChanged(ScrollableLayerGuid[] aScrollingLayers);
-   async ScreenPixels(uint64_t aRequestId, bool aSuccess,
-                      FileDescriptor? aAcquireFence);
- };

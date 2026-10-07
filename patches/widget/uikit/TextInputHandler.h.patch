@@ -1,5 +1,5 @@
 diff --git a/widget/uikit/TextInputHandler.h b/widget/uikit/TextInputHandler.h
-index 5073da48f88c..9e1b3622257b 100644
+index 5073da48f88c..f9f4d13adb1b 100644
 --- a/widget/uikit/TextInputHandler.h
 +++ b/widget/uikit/TextInputHandler.h
 @@ -8,13 +8,19 @@
@@ -22,7 +22,7 @@ index 5073da48f88c..9e1b3622257b 100644
  class TextEventDispatcher;
  
  // This is the temporary input class. When implementing UITextInpt protocol, we
-@@ -36,29 +42,94 @@ class TextInputHandler final : public TextEventDispatcherListener {
+@@ -36,29 +42,101 @@ class TextInputHandler final : public TextEventDispatcherListener {
                              WidgetKeyboardEvent& aKeyboardEvent,
                              uint32_t aIndexOfKeypress, void* aData) override;
  
@@ -51,18 +51,24 @@ index 5073da48f88c..9e1b3622257b 100644
 +
 +  bool QueryNativeTextInput(const NativeTextInputRequest& aRequest,
 +                            NativeTextInputReply& aReply);
-+  const NativeTextInputReply* NativeTextInputState();
-+  bool SynchronizeTextInputState(bool aNotifyInputDelegate = false);
 +  void InvalidateTextInputState(bool aFocusChanged = false);
 +  void InvalidateTextInputGeometry();
-+  void UpdateSelectionScrollState();
++  const NativeTextInputReply* NativeTextInputState();
++  bool SynchronizeTextInputState(bool aNotifyInputDelegate = false);
 +
 +  bool TextLength(uint32_t& aLength);
 +  bool TextInRange(const NSRange& aRange, nsString& aText);
 +  bool ReplaceRange(const NSRange& aRange, NSString* aText);
-+  bool EditorRect(LayoutDeviceIntRect& aRect);
++
++  LayoutDeviceRect TransformSelectionRect(
++      const LayoutDeviceIntRect& aRect,
++      const nsTArray<NativeTextInputScrollReference>& aReferences) const;
++  bool EditorRect(LayoutDeviceRect& aRect);
 +  bool RunCommand(EventMessage aMessage, bool aOnlyEnabledCheck,
 +                  bool* aIsEnabled = nullptr);
++
++  bool SelectionUsesScroller(const layers::ScrollableLayerGuid& aGuid) const;
++  void UpdateSelectionScrollState(bool aSelectionMoved = false);
 +
    void OnDestroyed();
  
@@ -115,6 +121,7 @@ index 5073da48f88c..9e1b3622257b 100644
 +  bool mNativeTextInputStateDirty = true;
 +  bool mNativeTextInputGeometryDirty = true;
 +  bool mSynchronizingNativeTextInputState = false;
++  bool mUpdatingSelectionFromCompositor = false;
 +
 +  UniquePtr<GeckoKeyboardSupport> mKeyboardSupport;
 +  AutoTArray<UniquePtr<KeyEventState>, 1> mCurrentKeyEvents;

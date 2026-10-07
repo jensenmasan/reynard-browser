@@ -1,5 +1,5 @@
 diff --git a/dom/events/ContentEventHandler.cpp b/dom/events/ContentEventHandler.cpp
-index d11a218cd050..d9c35892db0b 100644
+index d11a218cd050..6181ef47000d 100644
 --- a/dom/events/ContentEventHandler.cpp
 +++ b/dom/events/ContentEventHandler.cpp
 @@ -6,43 +6,59 @@
@@ -62,7 +62,7 @@ index d11a218cd050..d9c35892db0b 100644
  #include "nsTextFrame.h"
  
  // Work around conflicting define in rpcndr.h
-@@ -443,6 +459,976 @@ Result<nsRange*, nsresult> ContentEventHandler::InitRootContent(
+@@ -443,6 +459,1083 @@ Result<nsRange*, nsresult> ContentEventHandler::InitRootContent(
    return rangeInRootElement;
  }
  
@@ -93,13 +93,10 @@ index d11a218cd050..d9c35892db0b 100644
 +      rect = rect.Intersect(*clip);
 +    }
 +
-+    if (ScrollContainerFrame* scroll = do_QueryFrame(frame)) {
-+      rect = rect.Intersect(scroll->GetScrollPortRect());
-+    }
-+
 +    const PhysicalAxes axes =
 +        frame->ShouldApplyOverflowClipping(frame->StyleDisplay());
-+    if (!axes.isEmpty()) {
++    ScrollContainerFrame* scroll = do_QueryFrame(frame);
++    if (!scroll && !axes.isEmpty()) {
 +      nsRect clip;
 +      nsRectCornerRadii radii;
 +      nsMargin inset;
@@ -123,6 +120,64 @@ index d11a218cd050..d9c35892db0b 100644
 +  return false;
 +}
 +
++static void CollectNativeScrollReferences(
++    nsIFrame* aFrame, nsTArray<NativeTextInputScrollReference>& aReferences) {
++  nsPresContext* context =
++      aFrame->PresContext()->GetInProcessRootContentDocumentPresContext();
++  if (!context) {
++    return;
++  }
++
++  PresShell* shell = context->PresShell();
++  nsIFrame* root = shell->GetRootFrame();
++  auto* rootScroll = shell->GetRootScrollContainerFrame();
++  const float resolution = shell->GetResolution();
++  bool hasRoot = false;
++
++  auto append = [&](ScrollContainerFrame* aScroll, bool aFixed) {
++    BrowserChild* browser = BrowserChild::GetFrom(aScroll->PresShell());
++    if (!browser || !aScroll->GetContent()) {
++      return;
++    }
++
++    NativeTextInputScrollReference reference;
++    reference.mGuid = layers::ScrollableLayerGuid(
++        browser->GetLayersId(), aScroll->PresShell()->GetPresShellId(),
++        nsLayoutUtils::FindOrCreateIDFor(aScroll->GetContent()));
++
++    const auto matrix = nsLayoutUtils::GetTransformToAncestor(
++        RelativeTo{aScroll}, RelativeTo{root});
++    const float scale = aScroll->PresContext()->CSSToDevPixelScale().scale;
++    const gfx::Point origin = matrix.TransformPoint(gfx::Point());
++    const gfx::Point x = matrix.TransformPoint(gfx::Point(scale, 0)) - origin;
++    const gfx::Point y = matrix.TransformPoint(gfx::Point(0, scale)) - origin;
++    reference.mXAxis = LayoutDevicePoint(x.x, x.y) * resolution;
++    reference.mYAxis = LayoutDevicePoint(y.x, y.y) * resolution;
++    reference.mOffset = aScroll->GetScrollPositionCSSPixels();
++
++    if (aScroll == rootScroll) {
++      reference.mZoom = scale * resolution;
++      reference.mFixed = aFixed;
++      const CSSPoint callback =
++          nsLayoutUtils::GetCumulativeApzCallbackTransform(aScroll);
++      reference.mOffset = aFixed ? callback : reference.mOffset + callback;
++      hasRoot = true;
++    }
++    aReferences.AppendElement(reference);
++  };
++
++  for (nsIFrame* frame = nsLayoutUtils::GetCrossDocParentFrameInProcess(aFrame);
++       frame; frame = nsLayoutUtils::GetCrossDocParentFrameInProcess(frame)) {
++    if (ScrollContainerFrame* scroll = do_QueryFrame(frame)) {
++      append(scroll, false);
++    }
++  }
++
++  if (!hasRoot && rootScroll) {
++    append(rootScroll, true);
++  }
++}
++
 +nsresult ContentEventHandler::QueryNativeTextInput(
 +    const NativeTextInputRequest& aRequest, NativeTextInputReply& aReply) {
 +  aReply = NativeTextInputReply();
@@ -142,7 +197,9 @@ index d11a218cd050..d9c35892db0b 100644
 +  // Convert frame app unit to root widget device pixel, then account
 +  // for the visual viewport.
 +  auto visualRect = [&](nsIFrame* aFrame, nsRect aRect,
-+                        LayoutDeviceIntRect& aResult) -> nsresult {
++                        LayoutDeviceIntRect& aResult,
++                        nsTArray<NativeTextInputScrollReference>* aReferences =
++                            nullptr) -> nsresult {
 +    nsresult result = ConvertToRootRelativeOffset(aFrame, aRect);
 +    NS_ENSURE_SUCCESS(result, result);
 +    nsPresContext* context = aFrame->PresContext();
@@ -152,6 +209,10 @@ index d11a218cd050..d9c35892db0b 100644
 +            context->GetInProcessRootContentDocumentPresContext()) {
 +      aResult = RoundedOut(ViewportUtils::DocumentRelativeLayoutToVisual(
 +          aResult, root->PresShell()));
++    }
++
++    if (aReferences) {
++      CollectNativeScrollReferences(aFrame, *aReferences);
 +    }
 +    return NS_OK;
 +  };
@@ -195,7 +256,8 @@ index d11a218cd050..d9c35892db0b 100644
 +    aRect.mRTL =
 +        frame->GetEmbeddingLevel().Direction() == intl::BidiDirection::RTL;
 +    aRect.mVertical = frame->GetWritingMode().IsVertical();
-+    return visualRect(frame.mFrame, rect, aRect.mRect);
++    return visualRect(frame.mFrame, rect, aRect.mRect,
++                      &aRect.mScrollReferences);
 +  };
 +
 +  if (aRequest.mQuery == NativeTextInputQuery::State ||
@@ -291,17 +353,15 @@ index d11a218cd050..d9c35892db0b 100644
 +      }
 +
 +      WidgetQueryContentEvent editor(true, eQueryEditorRect, widget);
-+      if (NS_SUCCEEDED(OnQueryEditorRect(&editor)) && editor.Succeeded()) {
-+        aReply.mRect = editor.mReply->mRect;
-+      }
++      rv = OnQueryEditorRect(&editor, &aReply);
++      NS_ENSURE_SUCCESS(rv, rv);
 +      break;
 +    }
 +    case NativeTextInputQuery::Appearance: {
 +      WidgetQueryContentEvent editor(true, eQueryEditorRect, widget);
-+      rv = OnQueryEditorRect(&editor);
++      rv = OnQueryEditorRect(&editor, &aReply);
 +      NS_ENSURE_SUCCESS(rv, rv);
 +      NS_ENSURE_TRUE(editor.Succeeded(), NS_ERROR_NOT_AVAILABLE);
-+      aReply.mRect = editor.mReply->mRect;
 +      break;
 +    }
 +    case NativeTextInputQuery::Caret: {
@@ -309,6 +369,7 @@ index d11a218cd050..d9c35892db0b 100644
 +      rv = caretAtOffset(aRequest.mOffset, aRequest.mAssociateWithNext, caret);
 +      NS_ENSURE_SUCCESS(rv, rv);
 +      aReply.mRect = caret.mRect;
++      aReply.mScrollReferences = std::move(caret.mScrollReferences);
 +      aReply.mRTL = caret.mRTL;
 +      break;
 +    }
@@ -576,7 +637,8 @@ index d11a218cd050..d9c35892db0b 100644
 +            rect = highlight.GetPhysicalRect(writingMode, size);
 +          }
 +
-+          rv = visualRect(rectFrame, rect, selectionRect.mRect);
++          rv = visualRect(rectFrame, rect, selectionRect.mRect,
++                          &selectionRect.mScrollReferences);
 +          NS_ENSURE_SUCCESS(rv, rv);
 +
 +          // Join fully selected lines into one highlight. Join other rects only
@@ -1032,6 +1094,51 @@ index d11a218cd050..d9c35892db0b 100644
 +    }
 +  }
 +
++  if (aRequest.mQuery == NativeTextInputQuery::State ||
++      aRequest.mQuery == NativeTextInputQuery::Appearance) {
++    uint32_t start = aRequest.mOffset;
++    uint32_t length = aRequest.mLength;
++    if (aRequest.mQuery == NativeTextInputQuery::State) {
++      start = aReply.mSelectionStart;
++      length = aReply.mSelectionLength;
++    }
++
++    if (start != UINT32_MAX && !aReply.mSuppressSelectionDisplay) {
++      for (uint32_t offset : {start, start + length}) {
++        for (bool after : {false, true}) {
++          NativeTextInputRect caret;
++          if (NS_SUCCEEDED(caretAtOffset(offset, after, caret))) {
++            caret.mStartOffset = offset;
++            caret.mAssociateWithNext = after;
++            aReply.mCaretRects.AppendElement(std::move(caret));
++          }
++        }
++        if (!length) {
++          break;
++        }
++      }
++
++      if (length) {
++        NativeTextInputRequest request;
++        request.mQuery = NativeTextInputQuery::SelectionHighlightRects;
++        request.mOffset = start;
++        request.mLength = length;
++        NativeTextInputReply geometry;
++        rv = QueryNativeTextInput(request, geometry);
++        NS_ENSURE_SUCCESS(rv, rv);
++        aReply.mRects = std::move(geometry.mRects);
++      }
++    }
++  }
++
++  for (const auto& caret : aReply.mCaretRects) {
++    for (const auto& reference : caret.mScrollReferences) {
++      if (!aReply.mSelectionScrollers.Contains(reference.mGuid)) {
++        aReply.mSelectionScrollers.AppendElement(reference.mGuid);
++      }
++    }
++  }
++
 +  aReply.mSucceeded = true;
 +  return NS_OK;
 +}
@@ -1039,7 +1146,7 @@ index d11a218cd050..d9c35892db0b 100644
  nsresult ContentEventHandler::InitCommon(EventMessage aEventMessage,
                                           SelectionType aSelectionType,
                                           bool aRequireFlush) {
-@@ -628,6 +1614,13 @@ nsresult ContentEventHandler::QueryContentRect(
+@@ -628,6 +1721,13 @@ nsresult ContentEventHandler::QueryContentRect(
  
    aEvent->mReply->mRect = LayoutDeviceIntRect::FromAppUnitsToOutside(
        resultRect, presContext->AppUnitsPerDevPixel());
@@ -1053,7 +1160,7 @@ index d11a218cd050..d9c35892db0b 100644
    // Returning empty rect may cause native IME confused, let's make sure to
    // return non-empty rect.
    EnsureNonEmptyRect(aEvent->mReply->mRect);
-@@ -635,6 +1628,32 @@ nsresult ContentEventHandler::QueryContentRect(
+@@ -635,6 +1735,32 @@ nsresult ContentEventHandler::QueryContentRect(
    return NS_OK;
  }
  
@@ -1086,7 +1193,7 @@ index d11a218cd050..d9c35892db0b 100644
  // Editor places a padding <br> element under its root content if the editor
  // doesn't have any text. This happens even for single line editors.
  // When we get text content and when we change the selection,
-@@ -2525,6 +3544,7 @@ nsresult ContentEventHandler::OnQueryTextRect(WidgetQueryContentEvent* aEvent) {
+@@ -2525,6 +3651,7 @@ nsresult ContentEventHandler::OnQueryTextRect(WidgetQueryContentEvent* aEvent) {
    }
    DOMRangeAndAdjustedOffsetInFlattenedText domRangeAndAdjustedOffset =
        domRangeAndAdjustedOffsetOrError.unwrap();
@@ -1094,7 +1201,16 @@ index d11a218cd050..d9c35892db0b 100644
    nsString string;
    if (NS_WARN_IF(NS_FAILED(
            GenerateFlatTextContent(domRangeAndAdjustedOffset.mRange, string)))) {
-@@ -2862,9 +3882,58 @@ nsresult ContentEventHandler::OnQueryEditorRect(
+@@ -2847,7 +3974,7 @@ nsresult ContentEventHandler::OnQueryTextRect(WidgetQueryContentEvent* aEvent) {
+ }
+ 
+ nsresult ContentEventHandler::OnQueryEditorRect(
+-    WidgetQueryContentEvent* aEvent) {
++    WidgetQueryContentEvent* aEvent, NativeTextInputReply* aNativeGeometry) {
+   nsresult rv = Init(aEvent);
+   if (NS_FAILED(rv)) {
+     return rv;
+@@ -2862,9 +3989,72 @@ nsresult ContentEventHandler::OnQueryEditorRect(
      }
    }
  
@@ -1114,6 +1230,12 @@ index d11a218cd050..d9c35892db0b 100644
 +  NS_ENSURE_SUCCESS(rv, rv);
 +
 +#ifdef XP_IOS
++  if (aNativeGeometry) {
++    aNativeGeometry->mRect = aEvent->mReply->mRect;
++    CollectNativeScrollReferences(editorContent->GetPrimaryFrame(),
++                                  aNativeGeometry->mScrollReferences);
++  }
++
 +  // Check every parent that clips the editor, including its own scroll area.
 +  for (nsIFrame* frame = editorFrame; frame;
 +       frame = nsLayoutUtils::GetCrossDocParentFrameInProcess(frame)) {
@@ -1148,6 +1270,14 @@ index d11a218cd050..d9c35892db0b 100644
 +      clipRect = RoundedOut(ViewportUtils::DocumentRelativeLayoutToVisual(
 +          clipRect, root->PresShell()));
 +    }
++
++    if (aNativeGeometry) {
++      NativeTextInputRect& nativeClip =
++          *aNativeGeometry->mClipRects.AppendElement();
++      nativeClip.mRect = clipRect;
++      CollectNativeScrollReferences(frame, nativeClip.mScrollReferences);
++    }
++
 +    // Preserve an empty clip when the editor is entirely out of view.
 +    aEvent->mReply->mRect = aEvent->mReply->mRect.Intersect(clipRect);
 +  }
@@ -1155,7 +1285,7 @@ index d11a218cd050..d9c35892db0b 100644
  
    MOZ_ASSERT(aEvent->Succeeded());
    return NS_OK;
-@@ -3416,13 +4485,63 @@ nsresult ContentEventHandler::ConvertToRootRelativeOffset(nsIFrame* aFrame,
+@@ -3416,13 +4606,63 @@ nsresult ContentEventHandler::ConvertToRootRelativeOffset(nsIFrame* aFrame,
    if (NS_WARN_IF(!rootPC)) {
      return NS_ERROR_FAILURE;
    }
@@ -1220,7 +1350,7 @@ index d11a218cd050..d9c35892db0b 100644
    // TransformFrameRectToAncestor returned the rect in the ancestor's appUnits,
    // but we want it in aFrame's units (in case of different full-zoom factors),
    // so convert back.
-@@ -3481,7 +4600,8 @@ static void AdjustRangeForSelection(const Element* aRootElement,
+@@ -3481,7 +4721,8 @@ static void AdjustRangeForSelection(const Element* aRootElement,
    }
  }
  
@@ -1230,7 +1360,7 @@ index d11a218cd050..d9c35892db0b 100644
    aEvent->mSucceeded = false;
  
    // Get selection to manipulate
-@@ -3533,6 +4653,19 @@ nsresult ContentEventHandler::OnSelectionEvent(WidgetSelectionEvent* aEvent) {
+@@ -3533,6 +4774,19 @@ nsresult ContentEventHandler::OnSelectionEvent(WidgetSelectionEvent* aEvent) {
      }
    }
  
@@ -1250,7 +1380,7 @@ index d11a218cd050..d9c35892db0b 100644
    if (aEvent->mReversed) {
      nsCOMPtr<nsINode> startNodeStrong(startNode);
      nsCOMPtr<nsINode> endNodeStrong(endNode);
-@@ -3558,7 +4691,8 @@ nsresult ContentEventHandler::OnSelectionEvent(WidgetSelectionEvent* aEvent) {
+@@ -3558,7 +4812,8 @@ nsresult ContentEventHandler::OnSelectionEvent(WidgetSelectionEvent* aEvent) {
    // `ContentEventHandler` is a `MOZ_STACK_CLASS`, so `mSelection` is known to
    // be alive.
    MOZ_KnownLive(mSelection)

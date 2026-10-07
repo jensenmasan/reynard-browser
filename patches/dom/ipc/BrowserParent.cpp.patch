@@ -1,5 +1,5 @@
 diff --git a/dom/ipc/BrowserParent.cpp b/dom/ipc/BrowserParent.cpp
-index 7661a1e0bfbf..521173c980ec 100644
+index 7661a1e0bfbf..147d23d018cf 100644
 --- a/dom/ipc/BrowserParent.cpp
 +++ b/dom/ipc/BrowserParent.cpp
 @@ -142,6 +142,10 @@
@@ -48,12 +48,12 @@ index 7661a1e0bfbf..521173c980ec 100644
 -        widget->GetDynamicToolbarMaxHeight());
 +        widget->GetDynamicToolbarMaxHeight(),
 +        widget->GetDynamicToolbarMinHeight());
-+  }
+   }
 +
 +#  ifdef XP_IOS
 +  if (mBackgroundColor) {
 +    mozilla::widget::DispatchBackgroundColor(widget, *mBackgroundColor);
-   }
++  }
 +#  endif
  #endif
  }
@@ -105,30 +105,10 @@ index 7661a1e0bfbf..521173c980ec 100644
  mozilla::ipc::IPCResult BrowserParent::RecvSetLinkStatus(
      const nsString& aStatus) {
    nsCOMPtr<nsIXULBrowserWindow> xulBrowserWindow = GetXULBrowserWindow();
-@@ -3236,6 +3281,73 @@ bool BrowserParent::HandleQueryContentEvent(WidgetQueryContentEvent& aEvent) {
+@@ -3236,6 +3281,76 @@ bool BrowserParent::HandleQueryContentEvent(WidgetQueryContentEvent& aEvent) {
    return true;
  }
  
-+bool BrowserParent::GetCachedCaretRect(uint32_t aOffset,
-+                                       LayoutDeviceIntRect& aRect) {
-+  nsCOMPtr<nsIWidget> widget = GetTextInputHandlingWidget();
-+  nsCOMPtr<nsIWidget> browserWidget = GetWidget();
-+  if (mIsDestroyed || !widget || !browserWidget) {
-+    return false;
-+  }
-+
-+  if (!mContentCache.GetCachedCaretRect(aOffset, aRect)) {
-+    return false;
-+  }
-+
-+  if (browserWidget != widget) {
-+    aRect += nsLayoutUtils::WidgetToWidgetOffset(browserWidget, widget);
-+  }
-+
-+  aRect = TransformChildToParent(aRect);
-+  return true;
-+}
-+
 +mozilla::ipc::IPCResult BrowserParent::RecvNativeTextInputPositionChanged() {
 +#ifdef MOZ_WIDGET_UIKIT
 +  RefPtr<BrowserParent> focused = GetFocused();
@@ -166,12 +146,35 @@ index 7661a1e0bfbf..521173c980ec 100644
 +    return false;
 +  }
 +
++  auto transformReferences =
++      [&](nsTArray<NativeTextInputScrollReference>& aReferences) {
++        for (auto& reference : aReferences) {
++          const LayoutDevicePoint origin =
++              TransformChildToParent(reference.mOrigin + offset);
++          reference.mXAxis = TransformChildToParent(reference.mOrigin +
++                                                    reference.mXAxis + offset) -
++                             origin;
++          reference.mYAxis = TransformChildToParent(reference.mOrigin +
++                                                    reference.mYAxis + offset) -
++                             origin;
++          reference.mOrigin = origin;
++        }
++      };
++  auto transformRects = [&](nsTArray<NativeTextInputRect>& aRects) {
++    for (auto& rect : aRects) {
++      rect.mRect = TransformChildToParent(rect.mRect + offset);
++      transformReferences(rect.mScrollReferences);
++    }
++  };
++
++  transformReferences(aReply.mScrollReferences);
 +  if (!aReply.mRect.IsEmpty()) {
 +    aReply.mRect = TransformChildToParent(aReply.mRect + offset);
 +  }
-+  for (auto& rect : aReply.mRects) {
-+    rect.mRect = TransformChildToParent(rect.mRect + offset);
-+  }
++
++  transformRects(aReply.mRects);
++  transformRects(aReply.mClipRects);
++  transformRects(aReply.mCaretRects);
 +
 +  return true;
 +}
@@ -179,7 +182,7 @@ index 7661a1e0bfbf..521173c980ec 100644
  bool BrowserParent::SendCompositionEvent(WidgetCompositionEvent& aEvent,
                                           uint32_t aCompositionId) {
    if (mIsDestroyed) {
-@@ -3253,9 +3365,15 @@ bool BrowserParent::SendCompositionEvent(WidgetCompositionEvent& aEvent,
+@@ -3253,9 +3368,15 @@ bool BrowserParent::SendCompositionEvent(WidgetCompositionEvent& aEvent,
      return true;
    }
  
@@ -195,7 +198,7 @@ index 7661a1e0bfbf..521173c980ec 100644
    if (NS_WARN_IF(!ret)) {
      return false;
    }
-@@ -3272,14 +3390,20 @@ bool BrowserParent::SendSelectionEvent(WidgetSelectionEvent& aEvent) {
+@@ -3272,14 +3393,20 @@ bool BrowserParent::SendSelectionEvent(WidgetSelectionEvent& aEvent) {
      return true;
    }
    mContentCache.OnSelectionEvent(aEvent);
@@ -217,7 +220,7 @@ index 7661a1e0bfbf..521173c980ec 100644
    return true;
  }
  
-@@ -3306,10 +3430,15 @@ bool BrowserParent::SendInsertText(const WidgetContentCommandEvent& aEvent) {
+@@ -3306,10 +3433,15 @@ bool BrowserParent::SendInsertText(const WidgetContentCommandEvent& aEvent) {
      return false;
    }
    mContentCache.OnContentCommandEvent(aEvent);
@@ -233,7 +236,7 @@ index 7661a1e0bfbf..521173c980ec 100644
  }
  
  bool BrowserParent::SendReplaceText(const WidgetContentCommandEvent& aEvent) {
-@@ -3470,7 +3599,20 @@ mozilla::ipc::IPCResult BrowserParent::RecvGetInputContext(
+@@ -3470,7 +3602,20 @@ mozilla::ipc::IPCResult BrowserParent::RecvGetInputContext(
  
  mozilla::ipc::IPCResult BrowserParent::RecvSetInputContext(
      const InputContext& aContext, const InputContextAction& aAction) {
@@ -254,7 +257,7 @@ index 7661a1e0bfbf..521173c980ec 100644
    return IPC_OK();
  }
  
-@@ -3920,7 +4062,8 @@ mozilla::ipc::IPCResult BrowserParent::RecvInvokeDragSession(
+@@ -3920,7 +4065,8 @@ mozilla::ipc::IPCResult BrowserParent::RecvInvokeDragSession(
      const MaybeDiscarded<WindowContext>& aSourceTopWindowContext) {
    nsCOMPtr<nsIDragService> dragService =
        do_GetService("@mozilla.org/widget/dragservice;1");
@@ -264,7 +267,7 @@ index 7661a1e0bfbf..521173c980ec 100644
    const bool isValidRemoteDrag = [&]() {
      if (!dragService || !presContext) {
        return false;
-@@ -3983,6 +4126,10 @@ mozilla::ipc::IPCResult BrowserParent::RecvInvokeDragSession(
+@@ -3983,6 +4129,10 @@ mozilla::ipc::IPCResult BrowserParent::RecvInvokeDragSession(
    presContext->EventStateManager()->BeginTrackingRemoteDragGesture(
        mFrameElement, dragStartData);
  

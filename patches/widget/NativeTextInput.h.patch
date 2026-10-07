@@ -1,9 +1,9 @@
 diff --git a/widget/NativeTextInput.h b/widget/NativeTextInput.h
 new file mode 100644
-index 000000000000..6a319bbff94b
+index 000000000000..c301d414e1be
 --- /dev/null
 +++ b/widget/NativeTextInput.h
-@@ -0,0 +1,104 @@
+@@ -0,0 +1,129 @@
 +/* This Source Code Form is subject to the terms of the Mozilla Public
 + * License, v. 2.0. If a copy of the MPL was not distributed with this
 + * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
@@ -71,6 +71,16 @@ index 000000000000..6a319bbff94b
 +  nsString mText;
 +};
 +
++struct NativeTextInputScrollReference {
++  layers::ScrollableLayerGuid mGuid;
++  CSSPoint mOffset;
++  LayoutDevicePoint mXAxis;
++  LayoutDevicePoint mYAxis;
++  LayoutDevicePoint mOrigin;
++  float mZoom = 0.0f;
++  bool mFixed = false;
++};
++
 +struct NativeTextInputRect {
 +  LayoutDeviceIntRect mRect;
 +  uint32_t mStartOffset = 0;
@@ -79,6 +89,8 @@ index 000000000000..6a319bbff94b
 +  bool mVertical = false;
 +  bool mContainsStart = false;
 +  bool mContainsEnd = false;
++  CopyableTArray<NativeTextInputScrollReference> mScrollReferences;
++  bool mAssociateWithNext = true;
 +};
 +
 +struct NativeTextInputReply {
@@ -103,6 +115,19 @@ index 000000000000..6a319bbff94b
 +  bool mBackward = false;
 +  nsTArray<NativeTextInputRect> mRects;
 +  nsTArray<layers::ScrollableLayerGuid> mSelectionScrollers;
++  nsTArray<NativeTextInputScrollReference> mScrollReferences;
++  nsTArray<NativeTextInputRect> mClipRects;
++  nsTArray<NativeTextInputRect> mCaretRects;
++};
++
++struct NativeTextInputScrollUpdate {
++  layers::ScrollableLayerGuid mGuid;
++  CSSPoint mVisualOffset;
++  CSSPoint mLayoutOffset;
++  float mZoom = 1.0f;
++  bool mScrolling = false;
++
++  bool operator==(const NativeTextInputScrollUpdate&) const = default;
 +};
 +
 +}  // namespace mozilla

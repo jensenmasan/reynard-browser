@@ -1,6 +1,6 @@
 diff --git a/widget/uikit/GeckoPointerSupport.mm b/widget/uikit/GeckoPointerSupport.mm
 new file mode 100644
-index 000000000000..41d334831cf3
+index 000000000000..f5fd4d35e594
 --- /dev/null
 +++ b/widget/uikit/GeckoPointerSupport.mm
 @@ -0,0 +1,790 @@
@@ -337,7 +337,7 @@ index 000000000000..41d334831cf3
 +  }
 +
 +  TextInputHandler* handler = mGeckoChild->GetTextInputHandler();
-+  LayoutDeviceIntRect editorDevRect;
++  LayoutDeviceRect editorDevRect;
 +  if (!handler || !handler->EditorRect(editorDevRect)) {
 +    return NO;
 +  }
