@@ -1,9 +1,9 @@
 diff --git a/widget/uikit/GeckoEditableSupport.mm b/widget/uikit/GeckoEditableSupport.mm
 new file mode 100644
-index 000000000000..7b60c511dfd4
+index 000000000000..1dcdd568e0ce
 --- /dev/null
 +++ b/widget/uikit/GeckoEditableSupport.mm
-@@ -0,0 +1,3409 @@
+@@ -0,0 +1,3411 @@
 +/* This Source Code Form is subject to the terms of the Mozilla Public
 + * License, v. 2.0. If a copy of the MPL was not distributed with this
 + * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
@@ -2102,6 +2102,7 @@ index 000000000000..7b60c511dfd4
 +  }
 +
 +  if (handler->ReplaceRange(range, aText)) {
++    [[self interactionAssistant] selectionChanged];
 +    [self scrollSelectionToVisible:NO];
 +    [self refreshSelectionUI];
 +  }
@@ -2383,8 +2384,9 @@ index 000000000000..7b60c511dfd4
 +  request.mLength = range.length;
 +  CopyNSStringToXPCOMString(aText ?: @"", request.mText);
 +  NativeTextInputReply reply;
-+  if (handler->QueryNativeTextInput(request, reply)) {
-+    handler->SynchronizeTextInputState();
++  if (handler->QueryNativeTextInput(request, reply) &&
++      handler->SynchronizeTextInputState()) {
++    [[self interactionAssistant] selectionChanged];
 +    [self refreshSelectionUI];
 +  }
 +}
