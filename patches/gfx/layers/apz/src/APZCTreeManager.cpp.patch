@@ -1,5 +1,5 @@
 diff --git a/gfx/layers/apz/src/APZCTreeManager.cpp b/gfx/layers/apz/src/APZCTreeManager.cpp
-index b17a25de70dc..ecc8509a073e 100644
+index b17a25de70dc..f21ef2d56d68 100644
 --- a/gfx/layers/apz/src/APZCTreeManager.cpp
 +++ b/gfx/layers/apz/src/APZCTreeManager.cpp
 @@ -4,11 +4,13 @@
@@ -35,8 +35,8 @@ index b17a25de70dc..ecc8509a073e 100644
 +      const auto transform = apzc->GetCurrentAsyncTransform(
 +          AsyncPanZoomController::eForCompositing,
 +          {AsyncTransformComponent::eLayout});
-+      const CSSPoint pendingScroll = transform.mTranslation / apzc->GetZoom();
-+      scrolling = !FuzzyEqualsPoint(pendingScroll, CSSPoint());
++      scrolling =
++          gfx::RoundedToInt(transform.mTranslation) != ParentLayerIntPoint();
 +    }
 +
 +    if (scrolling) {
