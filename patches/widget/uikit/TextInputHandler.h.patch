@@ -1,5 +1,5 @@
 diff --git a/widget/uikit/TextInputHandler.h b/widget/uikit/TextInputHandler.h
-index 5073da48f88c..dbd64acee01d 100644
+index 5073da48f88c..9e1b3622257b 100644
 --- a/widget/uikit/TextInputHandler.h
 +++ b/widget/uikit/TextInputHandler.h
 @@ -8,13 +8,19 @@
@@ -22,7 +22,7 @@ index 5073da48f88c..dbd64acee01d 100644
  class TextEventDispatcher;
  
  // This is the temporary input class. When implementing UITextInpt protocol, we
-@@ -36,29 +42,93 @@ class TextInputHandler final : public TextEventDispatcherListener {
+@@ -36,29 +42,94 @@ class TextInputHandler final : public TextEventDispatcherListener {
                              WidgetKeyboardEvent& aKeyboardEvent,
                              uint32_t aIndexOfKeypress, void* aData) override;
  
@@ -55,6 +55,7 @@ index 5073da48f88c..dbd64acee01d 100644
 +  bool SynchronizeTextInputState(bool aNotifyInputDelegate = false);
 +  void InvalidateTextInputState(bool aFocusChanged = false);
 +  void InvalidateTextInputGeometry();
++  void UpdateSelectionScrollState();
 +
 +  bool TextLength(uint32_t& aLength);
 +  bool TextInRange(const NSRange& aRange, nsString& aText);

@@ -1,5 +1,5 @@
 diff --git a/widget/uikit/nsWindow.mm b/widget/uikit/nsWindow.mm
-index c1c4c3deb341..567f8c0498d4 100644
+index c1c4c3deb341..fe8ce7e8c3bf 100644
 --- a/widget/uikit/nsWindow.mm
 +++ b/widget/uikit/nsWindow.mm
 @@ -11,12 +11,14 @@
@@ -902,10 +902,7 @@ index c1c4c3deb341..567f8c0498d4 100644
 +}
 +
 +// Focus and input
- 
--  if (!mParent && mNativeView.window) {
--    // convert to screen coords
--    temp = [mNativeView.window convertPoint:temp toWindow:nil];
++
 +void nsWindow::SetFocus(Raise, mozilla::dom::CallerType) {
 +  [[mNativeView window] makeKeyWindow];
 +  [mNativeView becomeFirstResponder];
@@ -914,26 +911,29 @@ index c1c4c3deb341..567f8c0498d4 100644
 +bool nsWindow::FocusForHardwareKeyboard() {
 +  if (!mNativeView || ![mNativeView window]) {
 +    return false;
-   }
++  }
  
--  offset.x += static_cast<int32_t>(temp.x);
--  offset.y += static_cast<int32_t>(temp.y);
+-  if (!mParent && mNativeView.window) {
+-    // convert to screen coords
+-    temp = [mNativeView.window convertPoint:temp toWindow:nil];
 +  const bool wasSuppressed = mSoftwareKeyboardSuppressed;
 +  mSoftwareKeyboardSuppressed = true;
 +  if (![mNativeView becomeFirstResponder]) {
 +    mSoftwareKeyboardSuppressed = wasSuppressed;
 +    return false;
-+  }
+   }
 +  [mNativeView reloadInputViews];
 +  return true;
 +}
  
--  return offset;
+-  offset.x += static_cast<int32_t>(temp.x);
+-  offset.y += static_cast<int32_t>(temp.y);
 +void nsWindow::DismissSoftwareKeyboard() {
 +  mSoftwareKeyboardSuppressed = true;
 +  [mNativeView dismissSoftwareKeyboard];
 +}
-+
+ 
+-  return offset;
 +// Rendering
 +
 +void nsWindow::Invalidate(const LayoutDeviceIntRect& aRect) {
@@ -1010,8 +1010,7 @@ index c1c4c3deb341..567f8c0498d4 100644
 +    [mNativeView scheduleResponderBlur];
 +    return;
 +  }
- 
--  if (aAction.UserMightRequestOpenVKB() || changingEnabledState) {
++
 +  // Existing first-responder ownership may be hardware-only. Software keyboard
 +  // authorization is tracked separately by mSoftwareKeyboardSuppressed.
 +  const bool shouldBecomeFirstResponder =
@@ -1023,7 +1022,8 @@ index c1c4c3deb341..567f8c0498d4 100644
 +    [mNativeView cancelResponderBlur];
 +    [mNativeView becomeFirstResponder];
 +  }
-+
+ 
+-  if (aAction.UserMightRequestOpenVKB() || changingEnabledState) {
 +  if (shouldBecomeFirstResponder &&
 +      (aAction.UserMightRequestOpenVKB() || changingEnabledState)) {
      // TODO(m_kato):
@@ -1118,7 +1118,7 @@ index c1c4c3deb341..567f8c0498d4 100644
  int32_t nsWindow::RoundsWidgetCoordinatesTo() {
    if (BackingScaleFactor() == 2.0) {
      return 2;
-@@ -1118,10 +1380,206 @@ - (UIAccessibilityContainerType)accessibilityContainerType {
+@@ -1118,10 +1380,220 @@ - (UIAccessibilityContainerType)accessibilityContainerType {
    return 1;
  }
  
@@ -1195,8 +1195,22 @@ index c1c4c3deb341..567f8c0498d4 100644
 +  }
 +}
 +
-+void nsWindow::NotifyAsyncScrollStateChanged(bool aScrolling) {
-+  [mNativeView asyncScrollStateChanged:aScrolling];
++void nsWindow::NotifyAsyncScrollStateChanged(
++    const nsTArray<ScrollableLayerGuid>& aScrollingLayers) {
++  mAsyncScrollingLayers = aScrollingLayers.Clone();
++  if (mTextInputHandler) {
++    mTextInputHandler->UpdateSelectionScrollState();
++  }
++}
++
++bool nsWindow::IsAsyncScrolling(
++    const nsTArray<ScrollableLayerGuid>& aScrollers) const {
++  for (const auto& scroller : aScrollers) {
++    if (mAsyncScrollingLayers.Contains(scroller)) {
++      return true;
++    }
++  }
++  return false;
 +}
 +
 +void nsWindow::UpdateDynamicToolbarHeights(ScreenIntCoord aMaxHeight,
@@ -1325,7 +1339,7 @@ index c1c4c3deb341..567f8c0498d4 100644
  void nsWindow::HandleMainThreadCATransaction() {
    // Trigger a synchronous OMTC composite. This will call NextSurface and
    // NotifySurfaceReady on the compositor thread to update mNativeLayerRoot's
-@@ -1199,6 +1657,8 @@ - (UIAccessibilityContainerType)accessibilityContainerType {
+@@ -1199,6 +1671,8 @@ - (UIAccessibilityContainerType)accessibilityContainerType {
    }
  }
  
@@ -1334,7 +1348,7 @@ index c1c4c3deb341..567f8c0498d4 100644
  EventDispatcher* nsWindow::GetEventDispatcher() const {
    if (mIOSView) {
      return mIOSView->mEventDispatcher;
-@@ -1206,28 +1666,131 @@ - (UIAccessibilityContainerType)accessibilityContainerType {
+@@ -1206,28 +1680,131 @@ - (UIAccessibilityContainerType)accessibilityContainerType {
    return nullptr;
  }
  
@@ -1480,7 +1494,7 @@ index c1c4c3deb341..567f8c0498d4 100644
  NS_IMPL_ISUPPORTS(IOSView, nsIGeckoViewEventDispatcher, nsIGeckoViewView)
  
  nsresult IOSView::GetInitData(JSContext* aCx,
-@@ -1248,6 +1811,81 @@ - (UIView*)view {
+@@ -1248,6 +1825,81 @@ - (UIView*)view {
    return mWindow ? (UIView*)mWindow->GetNativeData(NS_NATIVE_WIDGET) : nil;
  }
  
@@ -1562,7 +1576,7 @@ index c1c4c3deb341..567f8c0498d4 100644
  - (void)close {
    if (mWindow) {
      if (IOSView* iosView = mWindow->GetIOSView()) {
-@@ -1261,6 +1899,7 @@ - (void)close {
+@@ -1261,6 +1913,7 @@ - (void)close {
      outerWin->ForceClose();
    }
  }

@@ -1,5 +1,5 @@
 diff --git a/widget/nsIWidget.h b/widget/nsIWidget.h
-index 031a63b997c3..0efe1d20fff6 100644
+index 031a63b997c3..3fa620f70782 100644
 --- a/widget/nsIWidget.h
 +++ b/widget/nsIWidget.h
 @@ -1606,8 +1606,8 @@ class nsIWidget : public nsSupportsWeakReference {
@@ -13,15 +13,16 @@ index 031a63b997c3..0efe1d20fff6 100644
    };
  
    /**
-@@ -2304,6 +2304,7 @@ class nsIWidget : public nsSupportsWeakReference {
+@@ -2304,6 +2304,8 @@ class nsIWidget : public nsSupportsWeakReference {
     */
    virtual void NotifyCompositorScrollUpdates(
        const nsTArray<mozilla::layers::CompositorScrollUpdate>& aUpdates) {}
-+  virtual void NotifyAsyncScrollStateChanged(bool aScrolling) {}
++  virtual void NotifyAsyncScrollStateChanged(
++      const nsTArray<mozilla::layers::ScrollableLayerGuid>& aScrollingLayers) {}
  
  #if defined(MOZ_WIDGET_ANDROID)
    /**
-@@ -2313,12 +2314,16 @@ class nsIWidget : public nsSupportsWeakReference {
+@@ -2313,12 +2315,16 @@ class nsIWidget : public nsSupportsWeakReference {
     * @param aMessage message being sent to Android UI thread.
     */
    virtual void RecvToolbarAnimatorMessageFromCompositor(int32_t aMessage) {}

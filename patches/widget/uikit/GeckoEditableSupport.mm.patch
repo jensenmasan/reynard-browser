@@ -1,9 +1,9 @@
 diff --git a/widget/uikit/GeckoEditableSupport.mm b/widget/uikit/GeckoEditableSupport.mm
 new file mode 100644
-index 000000000000..0bea8a9f30c5
+index 000000000000..7b60c511dfd4
 --- /dev/null
 +++ b/widget/uikit/GeckoEditableSupport.mm
-@@ -0,0 +1,3387 @@
+@@ -0,0 +1,3409 @@
 +/* This Source Code Form is subject to the terms of the Mozilla Public
 + * License, v. 2.0. If a copy of the MPL was not distributed with this
 + * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
@@ -431,7 +431,22 @@ index 000000000000..0bea8a9f30c5
 +  mNativeTextInputGeometryDirty = true;
 +}
 +
++void TextInputHandler::UpdateSelectionScrollState() {
++  RefPtr<TextInputHandler> self(this);
++  if (Destroyed()) {
++    return;
++  }
++
++  ChildView* view =
++      static_cast<ChildView*>(mWidget->GetNativeData(NS_NATIVE_WIDGET));
++  const bool scrolling =
++      mNativeTextInputState &&
++      mWidget->IsAsyncScrolling(mNativeTextInputState->mSelectionScrollers);
++  [view asyncScrollStateChanged:scrolling];
++}
++
 +const NativeTextInputReply* TextInputHandler::NativeTextInputState() {
++  RefPtr<TextInputHandler> self(this);
 +  if (mNativeTextInputStateDirty && !mSynchronizingNativeTextInputState) {
 +    if (!SynchronizeTextInputState(true)) {
 +      return nullptr;
@@ -455,7 +470,13 @@ index 000000000000..0bea8a9f30c5
 +    mNativeTextInputState->mCaretColorIsAuto = reply.mCaretColorIsAuto;
 +    mNativeTextInputState->mSuppressSelectionDisplay =
 +        reply.mSuppressSelectionDisplay;
++    mNativeTextInputState->mSelectionScrollers =
++        std::move(reply.mSelectionScrollers);
 +    mNativeTextInputGeometryDirty = false;
++    UpdateSelectionScrollState();
++    if (Destroyed()) {
++      return nullptr;
++    }
 +  }
 +
 +  return mNativeTextInputState.isSome() ? &mNativeTextInputState.ref()
@@ -519,6 +540,7 @@ index 000000000000..0bea8a9f30c5
 +  }
 +  if (currentFocus) {
 +    mNativeTextInputState = Some(std::move(reply));
++    UpdateSelectionScrollState();
 +  }
 +
 +  if (aNotifyInputDelegate) {

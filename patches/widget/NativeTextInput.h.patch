@@ -1,9 +1,9 @@
 diff --git a/widget/NativeTextInput.h b/widget/NativeTextInput.h
 new file mode 100644
-index 000000000000..b841552f1891
+index 000000000000..6a319bbff94b
 --- /dev/null
 +++ b/widget/NativeTextInput.h
-@@ -0,0 +1,102 @@
+@@ -0,0 +1,104 @@
 +/* This Source Code Form is subject to the terms of the Mozilla Public
 + * License, v. 2.0. If a copy of the MPL was not distributed with this
 + * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
@@ -15,6 +15,7 @@ index 000000000000..b841552f1891
 +#define mozilla_NativeTextInput_h
 +
 +#include "Units.h"
++#include "mozilla/layers/ScrollableLayerGuid.h"
 +#include "nsColor.h"
 +#include "nsString.h"
 +#include "nsTArray.h"
@@ -101,6 +102,7 @@ index 000000000000..b841552f1891
 +  bool mRTL = false;
 +  bool mBackward = false;
 +  nsTArray<NativeTextInputRect> mRects;
++  nsTArray<layers::ScrollableLayerGuid> mSelectionScrollers;
 +};
 +
 +}  // namespace mozilla

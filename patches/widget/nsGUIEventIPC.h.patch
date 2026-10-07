@@ -1,5 +1,5 @@
 diff --git a/widget/nsGUIEventIPC.h b/widget/nsGUIEventIPC.h
-index a2a73f583d28..7adb0c7c0705 100644
+index a2a73f583d28..d0fd960abc2f 100644
 --- a/widget/nsGUIEventIPC.h
 +++ b/widget/nsGUIEventIPC.h
 @@ -16,6 +16,7 @@
@@ -10,7 +10,7 @@ index a2a73f583d28..7adb0c7c0705 100644
  #include "mozilla/TextEvents.h"
  #include "mozilla/TouchEvents.h"
  #include "mozilla/WheelHandlingHelper.h"  // for WheelDeltaAdjustmentStrategy
-@@ -26,6 +27,31 @@
+@@ -26,6 +27,34 @@
  
  namespace IPC {
  
@@ -33,16 +33,19 @@ index a2a73f583d28..7adb0c7c0705 100644
 +DEFINE_IPC_SERIALIZER_WITH_FIELDS(mozilla::NativeTextInputRect, mRect,
 +                                  mStartOffset, mEndOffset, mRTL, mVertical,
 +                                  mContainsStart, mContainsEnd);
-+DEFINE_IPC_SERIALIZER_WITH_FIELDS(
-+    mozilla::NativeTextInputReply, mSucceeded, mEditable, mHasText, mCanUndo,
-+    mCanRedo, mScrolled, mCaretColor, mCaretColorIsAuto, mSuppressSelectionDisplay,
-+    mText, mSelectionStart, mSelectionLength, mOffset, mCharacterOffset,
-+    mAssociateWithNext, mHitSelectableContent, mRect, mRTL, mBackward, mRects);
++DEFINE_IPC_SERIALIZER_WITH_FIELDS(mozilla::NativeTextInputReply, mSucceeded,
++                                  mEditable, mHasText, mCanUndo, mCanRedo,
++                                  mScrolled, mCaretColor, mCaretColorIsAuto,
++                                  mSuppressSelectionDisplay, mText,
++                                  mSelectionStart, mSelectionLength, mOffset,
++                                  mCharacterOffset, mAssociateWithNext,
++                                  mHitSelectableContent, mRect, mRTL, mBackward,
++                                  mRects, mSelectionScrollers);
 +
  template <>
  struct ParamTraits<mozilla::EventMessage>
      : public ContiguousEnumSerializer<
-@@ -360,6 +386,7 @@ struct ParamTraits<mozilla::WidgetDragEvent> {
+@@ -360,6 +389,7 @@ struct ParamTraits<mozilla::WidgetDragEvent> {
      WriteParam(aWriter, aParam.mUserCancelled);
      WriteParam(aWriter, aParam.mDefaultPreventedOnContent);
      WriteParam(aWriter, aParam.mInHTMLEditorEventListener);
@@ -50,7 +53,7 @@ index a2a73f583d28..7adb0c7c0705 100644
    }
  
    static bool Read(MessageReader* aReader, paramType* aResult) {
-@@ -367,7 +394,8 @@ struct ParamTraits<mozilla::WidgetDragEvent> {
+@@ -367,7 +397,8 @@ struct ParamTraits<mozilla::WidgetDragEvent> {
                 aReader, mozilla::eDragEventClass, aResult) &&
             ReadParam(aReader, &aResult->mUserCancelled) &&
             ReadParam(aReader, &aResult->mDefaultPreventedOnContent) &&
@@ -60,7 +63,7 @@ index a2a73f583d28..7adb0c7c0705 100644
    }
  };
  
-@@ -664,6 +692,7 @@ struct ParamTraits<mozilla::WidgetSelectionEvent> {
+@@ -664,6 +695,7 @@ struct ParamTraits<mozilla::WidgetSelectionEvent> {
      WriteParam(aWriter, aParam.mLength);
      WriteParam(aWriter, aParam.mReversed);
      WriteParam(aWriter, aParam.mExpandToClusterBoundary);
@@ -68,7 +71,7 @@ index a2a73f583d28..7adb0c7c0705 100644
      WriteParam(aWriter, aParam.mSucceeded);
    }
  
-@@ -674,6 +703,7 @@ struct ParamTraits<mozilla::WidgetSelectionEvent> {
+@@ -674,6 +706,7 @@ struct ParamTraits<mozilla::WidgetSelectionEvent> {
             ReadParam(aReader, &aResult->mLength) &&
             ReadParam(aReader, &aResult->mReversed) &&
             ReadParam(aReader, &aResult->mExpandToClusterBoundary) &&
@@ -76,7 +79,7 @@ index a2a73f583d28..7adb0c7c0705 100644
             ReadParam(aReader, &aResult->mSucceeded);
    }
  };
-@@ -804,9 +834,10 @@ struct ParamTraits<mozilla::widget::InputContext::Origin>
+@@ -804,9 +837,10 @@ struct ParamTraits<mozilla::widget::InputContext::Origin>
  
  DEFINE_IPC_SERIALIZER_WITH_FIELDS(mozilla::widget::InputContext, mIMEState,
                                    mHTMLInputType, mHTMLInputMode, mActionHint,
@@ -90,7 +93,7 @@ index a2a73f583d28..7adb0c7c0705 100644
  
  template <>
  struct ParamTraits<mozilla::widget::InputContextAction::Cause>
-@@ -1009,6 +1040,7 @@ struct ParamTraits<mozilla::PanGestureInput>
+@@ -1009,6 +1043,7 @@ struct ParamTraits<mozilla::PanGestureInput>
      WriteParam(aWriter, aParam.mMayTriggerSwipe);
      WriteParam(aWriter, aParam.mOverscrollBehaviorAllowsSwipe);
      WriteParam(aWriter, aParam.mSimulateMomentum);
@@ -98,7 +101,7 @@ index a2a73f583d28..7adb0c7c0705 100644
      WriteParam(aWriter, aParam.mIsNoLineOrPageDelta);
    }
  
-@@ -1032,6 +1064,8 @@ struct ParamTraits<mozilla::PanGestureInput>
+@@ -1032,6 +1067,8 @@ struct ParamTraits<mozilla::PanGestureInput>
                                 &paramType::SetOverscrollBehaviorAllowsSwipe) &&
             ReadBoolForBitfield(aReader, aResult,
                                 &paramType::SetSimulateMomentum) &&
