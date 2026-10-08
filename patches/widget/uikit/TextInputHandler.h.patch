@@ -1,5 +1,5 @@
 diff --git a/widget/uikit/TextInputHandler.h b/widget/uikit/TextInputHandler.h
-index 5073da48f88c..f9f4d13adb1b 100644
+index 5073da48f88c..3ccee5b0e783 100644
 --- a/widget/uikit/TextInputHandler.h
 +++ b/widget/uikit/TextInputHandler.h
 @@ -8,13 +8,19 @@
@@ -22,7 +22,7 @@ index 5073da48f88c..f9f4d13adb1b 100644
  class TextEventDispatcher;
  
  // This is the temporary input class. When implementing UITextInpt protocol, we
-@@ -36,29 +42,101 @@ class TextInputHandler final : public TextEventDispatcherListener {
+@@ -36,29 +42,103 @@ class TextInputHandler final : public TextEventDispatcherListener {
                              WidgetKeyboardEvent& aKeyboardEvent,
                              uint32_t aIndexOfKeypress, void* aData) override;
  
@@ -60,6 +60,8 @@ index 5073da48f88c..f9f4d13adb1b 100644
 +  bool TextInRange(const NSRange& aRange, nsString& aText);
 +  bool ReplaceRange(const NSRange& aRange, NSString* aText);
 +
++  gfx::Matrix SelectionScrollTransform(
++      const nsTArray<NativeTextInputScrollReference>& aReferences) const;
 +  LayoutDeviceRect TransformSelectionRect(
 +      const LayoutDeviceIntRect& aRect,
 +      const nsTArray<NativeTextInputScrollReference>& aReferences) const;

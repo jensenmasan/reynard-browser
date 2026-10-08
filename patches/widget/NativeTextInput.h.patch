@@ -1,9 +1,9 @@
 diff --git a/widget/NativeTextInput.h b/widget/NativeTextInput.h
 new file mode 100644
-index 000000000000..c301d414e1be
+index 000000000000..d79b197f9bc8
 --- /dev/null
 +++ b/widget/NativeTextInput.h
-@@ -0,0 +1,129 @@
+@@ -0,0 +1,133 @@
 +/* This Source Code Form is subject to the terms of the Mozilla Public
 + * License, v. 2.0. If a copy of the MPL was not distributed with this
 + * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
@@ -15,6 +15,7 @@ index 000000000000..c301d414e1be
 +#define mozilla_NativeTextInput_h
 +
 +#include "Units.h"
++#include "mozilla/gfx/Matrix.h"
 +#include "mozilla/layers/ScrollableLayerGuid.h"
 +#include "nsColor.h"
 +#include "nsString.h"
@@ -83,6 +84,9 @@ index 000000000000..c301d414e1be
 +
 +struct NativeTextInputRect {
 +  LayoutDeviceIntRect mRect;
++  LayoutDeviceRect mUntransformedRect;
++  gfx::Matrix mTransform;
++
 +  uint32_t mStartOffset = 0;
 +  uint32_t mEndOffset = 0;
 +  bool mRTL = false;

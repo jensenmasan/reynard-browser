@@ -1,9 +1,9 @@
 diff --git a/widget/uikit/GeckoEditableSupport.mm b/widget/uikit/GeckoEditableSupport.mm
 new file mode 100644
-index 000000000000..357533016880
+index 000000000000..a8c561e60144
 --- /dev/null
 +++ b/widget/uikit/GeckoEditableSupport.mm
-@@ -0,0 +1,3624 @@
+@@ -0,0 +1,3738 @@
 +/* This Source Code Form is subject to the terms of the Mozilla Public
 + * License, v. 2.0. If a copy of the MPL was not distributed with this
 + * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
@@ -122,6 +122,9 @@ index 000000000000..357533016880
 +
 +@protocol GeckoTextSelectionInteraction <NSObject>
 +@property(nonatomic, readonly) UITextRange* selectedRange;
++@property(nonatomic, readonly) id<UITextInput> document;
++@property(nonatomic, retain) UITextRange* base;
++@property(nonatomic, retain) UITextRange* initialExtent;
 +- (void)selectionChanged;
 +- (void)setSelectionWithPoint:(CGPoint)aPoint;
 +- (void)commit;
@@ -133,6 +136,7 @@ index 000000000000..357533016880
 +@end
 +
 +@protocol GeckoTextRangeAdjustmentInteraction <NSObject>
++@property(nonatomic, weak) id adjustmentDelegate;
 +@property(nonatomic, readonly) BOOL hasActiveTouch;
 +@property(nonatomic, readonly) CGPoint extentPoint;
 +@end
@@ -161,6 +165,8 @@ index 000000000000..357533016880
 +- (id<GeckoTextSelectionView>)activeSelectionController;
 +- (void)updateSelectionWithPoint:(CGPoint)aPoint;
 +- (id<GeckoTextRangeAdjustmentInteraction>)rangeAdjustmentInteraction;
++- (void)textRangeAdjustmentInteraction:(id)aInteraction
++                       didBeginAtPoint:(CGPoint)aPoint;
 +- (CGPoint)_rangeAdjustmentPointInTextInputCoordinateSpace:(CGPoint)aPoint;
 +- (id<GeckoTextEditMenuAssistant>)_editMenuAssistant API_AVAILABLE(ios(16.0));
 +@end
@@ -198,6 +204,9 @@ index 000000000000..357533016880
 +- (NSRange)rangeForTextRange:(UITextRange*)aRange;
 +- (ChildViewTextRange*)textRangeForRange:(NSRange)aRange;
 +- (ChildViewTextPosition*)textPosForPosition:(UITextPosition*)aPosition;
++
++- (CGRect)caretRectForPosition:(UITextPosition*)aPosition
++                     transform:(CGAffineTransform*)aTransform;
 +
 +- (void)replaceRangeWithTextWithoutClosingTyping:(UITextRange*)aRange
 +                                 replacementText:(NSString*)aText;
@@ -333,6 +342,10 @@ index 000000000000..357533016880
 +  return _rectValue;
 +}
 +
++- (CGAffineTransform)transform API_AVAILABLE(ios(17.4)) {
++  return _transformValue;
++}
++
 +- (NSWritingDirection)writingDirection {
 +  return _writingDirectionValue;
 +}
@@ -390,6 +403,7 @@ index 000000000000..357533016880
 +          aReply.mRect = caret.mRect;
 +          aReply.mRTL = caret.mRTL;
 +          aReply.mScrollReferences = caret.mScrollReferences.Clone();
++          aReply.mCaretRects.AppendElement(caret);
 +          hasCachedGeometry = true;
 +          break;
 +        }
@@ -739,8 +753,7 @@ index 000000000000..357533016880
 +  return QueryNativeTextInput(request, reply) && SynchronizeTextInputState();
 +}
 +
-+LayoutDeviceRect TextInputHandler::TransformSelectionRect(
-+    const LayoutDeviceIntRect& aRect,
++gfx::Matrix TextInputHandler::SelectionScrollTransform(
 +    const nsTArray<NativeTextInputScrollReference>& aReferences) const {
 +  LayoutDevicePoint translation;
 +  LayoutDevicePoint origin;
@@ -764,11 +777,18 @@ index 000000000000..357533016880
 +    }
 +  }
 +
-+  const LayoutDeviceRect rect(aRect.x, aRect.y, aRect.width, aRect.height);
++  const LayoutDevicePoint offset = origin * (1.0f - zoom) + translation * zoom;
++  return gfx::Matrix(zoom, 0, 0, zoom, offset.x, offset.y);
++}
 +
-+  return LayoutDeviceRect(
-+      origin + (rect.TopLeft() - origin + translation) * zoom,
-+      rect.Size() * zoom);
++LayoutDeviceRect TextInputHandler::TransformSelectionRect(
++    const LayoutDeviceIntRect& aRect,
++    const nsTArray<NativeTextInputScrollReference>& aReferences) const {
++  const gfx::Matrix transform = SelectionScrollTransform(aReferences);
++  return LayoutDeviceRect(aRect.x * transform._11 + transform._31,
++                          aRect.y * transform._22 + transform._32,
++                          aRect.width * transform._11,
++                          aRect.height * transform._22);
 +}
 +
 +bool TextInputHandler::EditorRect(LayoutDeviceRect& aRect) {
@@ -941,6 +961,35 @@ index 000000000000..357533016880
 +}
 +
 +namespace {
++
++CGRect UIKitSelectionGeometry(widget::TextInputHandler& aHandler,
++                              const NativeTextInputRect& aRect, CGFloat aScale,
++                              CGAffineTransform& aTransform,
++                              bool aCaret = false) {
++  gfx::Matrix transform = aRect.mTransform;
++  transform *= aHandler.SelectionScrollTransform(aRect.mScrollReferences);
++  LayoutDeviceRect rect = aRect.mUntransformedRect;
++  const gfx::Point center =
++      transform.TransformPoint(rect.Center().ToUnknownPoint());
++  if (aCaret && aRect.mVertical) {
++    // UIKit draws an upright caret, even in vertical text.
++    std::swap(rect.width, rect.height);
++    gfx::Matrix rotation(0, -1, 1, 0, 0, 0);
++    transform = rotation * transform;
++  }
++
++  // UIKit clips the rect before applying its transform. Keep its position in
++  // the text view and rotate around that position.
++  rect.MoveTo(LayoutDevicePoint(center.x, center.y) -
++              LayoutDevicePoint(rect.width, rect.height) / 2.0f);
++  const CGFloat x = center.x / aScale;
++  const CGFloat y = center.y / aScale;
++  aTransform = CGAffineTransformMake(transform._11, transform._12,
++                                     transform._21, transform._22,
++                                     x - transform._11 * x - transform._21 * y,
++                                     y - transform._12 * x - transform._22 * y);
++  return DevPixelsToUIKitPoints(rect, aScale);
++}
 +
 +NativeTextInputDirection NativeDirection(UITextDirection aDirection) {
 +  switch (aDirection) {
@@ -1359,12 +1408,19 @@ index 000000000000..357533016880
 +
 +- (void)attachToInteractions {
 +  [mAssistant interactions].assistantDelegate = self;
++  mAssistant.rangeAdjustmentInteraction.adjustmentDelegate = self;
 +}
 +
 +- (void)detach {
 +  UITextInteraction* interaction = [mAssistant interactions];
 +  if (interaction.assistantDelegate == self) {
 +    interaction.assistantDelegate = mAssistant;
++  }
++
++  id<GeckoTextRangeAdjustmentInteraction> adjustment =
++      mAssistant.rangeAdjustmentInteraction;
++  if (adjustment.adjustmentDelegate == self) {
++    adjustment.adjustmentDelegate = mAssistant;
 +  }
 +}
 +
@@ -1375,6 +1431,22 @@ index 000000000000..357533016880
 +
 +- (id)forwardingTargetForSelector:(SEL)aSelector {
 +  return mAssistant;
++}
++
++- (void)textRangeAdjustmentInteraction:(id)aInteraction
++                       didBeginAtPoint:(CGPoint)aPoint {
++  [mAssistant textRangeAdjustmentInteraction:aInteraction
++                             didBeginAtPoint:aPoint];
++
++  id<GeckoTextSelectionInteraction> selection =
++      mAssistant.activeSelectionController.selection;
++  id<UITextInput> document = selection.document;
++  UITextRange* range = document.selectedTextRange;
++
++  selection.base = [document textRangeFromPosition:range.start
++                                        toPosition:range.start];
++  selection.initialExtent = [document textRangeFromPosition:range.end
++                                                 toPosition:range.end];
 +}
 +
 +- (BOOL)scheduleReplacementsForRange:(UITextRange*)aRange
@@ -2609,7 +2681,8 @@ index 000000000000..357533016880
 +    return CGRectZero;
 +  }
 +
-+  return [self caretRectForPosition:aPlaceholder];
++  return [self firstRectForRange:[self textRangeFromPosition:aPlaceholder
++                                                  toPosition:aPlaceholder]];
 +}
 +
 +- (void)removeDictationResultPlaceholder:(id)aPlaceholder
@@ -2776,7 +2849,10 @@ index 000000000000..357533016880
 +  return CGRectIsNull(bounds) ? CGRectZero : bounds;
 +}
 +
-+- (CGRect)caretRectForPosition:(UITextPosition*)aPosition {
++- (CGRect)caretRectForPosition:(UITextPosition*)aPosition
++                     transform:(CGAffineTransform*)aTransform {
++  *aTransform = CGAffineTransformIdentity;
++
 +  ChildViewTextPosition* position = [self textPosForPosition:aPosition];
 +  RefPtr<widget::TextInputHandler> handler = [self textHandler];
 +  if (!position || !handler) {
@@ -2793,6 +2869,12 @@ index 000000000000..357533016880
 +    return CGRectZero;
 +  }
 +
++  if (@available(iOS 17.4, *)) {
++    const auto& caret = reply.mCaretRects[0];
++    return UIKitSelectionGeometry(*handler, caret, self.contentScaleFactor,
++                                  *aTransform, /* aCaret */ true);
++  }
++
 +  CGRect rect = DevPixelsToUIKitPoints(
 +      handler->TransformSelectionRect(reply.mRect, reply.mScrollReferences),
 +      self.contentScaleFactor);
@@ -2807,6 +2889,18 @@ index 000000000000..357533016880
 +    rect = CGRectInset(rect, 0, (rect.size.height - 2.0) / 2.0);
 +  }
 +  return rect;
++}
++
++- (CGRect)caretRectForPosition:(UITextPosition*)aPosition {
++  CGAffineTransform transform;
++  return [self caretRectForPosition:aPosition transform:&transform];
++}
++
++- (CGAffineTransform)caretTransformForPosition:(UITextPosition*)aPosition
++    API_AVAILABLE(ios(17.4)) {
++  CGAffineTransform transform;
++  [self caretRectForPosition:aPosition transform:&transform];
++  return transform;
 +}
 +
 +- (NSArray<UITextSelectionRect*>*)selectionRectsForRange:(UITextRange*)aRange {
@@ -2828,13 +2922,22 @@ index 000000000000..357533016880
 +  NSMutableArray<UITextSelectionRect*>* rects =
 +      [NSMutableArray arrayWithCapacity:reply.mRects.Length()];
 +  for (const auto& rect : reply.mRects) {
-+    CGRect highlight = DevPixelsToUIKitPoints(
-+        handler->TransformSelectionRect(rect.mRect, rect.mScrollReferences),
-+        self.contentScaleFactor);
++    CGRect highlight;
++    CGAffineTransform transform = CGAffineTransformIdentity;
++    if (@available(iOS 17.4, *)) {
++      highlight = UIKitSelectionGeometry(*handler, rect,
++                                         self.contentScaleFactor, transform);
++    } else {
++      highlight = DevPixelsToUIKitPoints(
++          handler->TransformSelectionRect(rect.mRect, rect.mScrollReferences),
++          self.contentScaleFactor);
++    }
++
 +    ChildViewTextSelectionRect* result =
 +        [ChildViewTextSelectionRect selectionRectWithRect:highlight
 +                                            containsStart:rect.mContainsStart
 +                                              containsEnd:rect.mContainsEnd];
++    result.transformValue = transform;
 +    result.writingDirectionValue = rect.mRTL ? NSWritingDirectionRightToLeft
 +                                             : NSWritingDirectionLeftToRight;
 +    result.verticalValue = rect.mVertical;
@@ -2850,16 +2953,27 @@ index 000000000000..357533016880
 +  }
 +
 +  if (!range.length) {
-+    return [self caretRectForPosition:aRange.start];
++    CGAffineTransform transform;
++    CGRect rect = [self caretRectForPosition:aRange.start transform:&transform];
++    return CGRectApplyAffineTransform(rect, transform);
 +  }
 +
 +  NSArray<UITextSelectionRect*>* rects = [self selectionRectsForRange:aRange];
++  UITextSelectionRect* first = rects.firstObject;
 +  for (UITextSelectionRect* rect in rects) {
 +    if (rect.containsStart) {
-+      return rect.rect;
++      first = rect;
++      break;
 +    }
 +  }
-+  return rects.count ? rects.firstObject.rect : CGRectZero;
++
++  if (!first) {
++    return CGRectZero;
++  }
++  if (@available(iOS 17.4, *)) {
++    return CGRectApplyAffineTransform(first.rect, first.transform);
++  }
++  return first.rect;
 +}
 +
 +- (UITextPosition*)closestPositionToPoint:(CGPoint)aPoint {

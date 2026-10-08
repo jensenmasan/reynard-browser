@@ -1,8 +1,16 @@
 diff --git a/dom/events/ContentEventHandler.h b/dom/events/ContentEventHandler.h
-index e383b6c7c97d..4ad82617e4c3 100644
+index e383b6c7c97d..2b0e46946def 100644
 --- a/dom/events/ContentEventHandler.h
 +++ b/dom/events/ContentEventHandler.h
-@@ -22,6 +22,9 @@ struct nsRect;
+@@ -11,6 +11,7 @@
+ #include "mozilla/RangeBoundary.h"
+ #include "mozilla/dom/Selection.h"
+ #include "mozilla/dom/Text.h"
++#include "mozilla/gfx/Matrix.h"
+ #include "nsCOMPtr.h"
+ #include "nsIFrame.h"
+ #include "nsINode.h"
+@@ -22,6 +23,9 @@ struct nsRect;
  
  namespace mozilla {
  
@@ -12,7 +20,7 @@ index e383b6c7c97d..4ad82617e4c3 100644
  namespace dom {
  class Element;
  }  // namespace dom
-@@ -128,6 +131,9 @@ class MOZ_STACK_CLASS ContentEventHandler {
+@@ -128,6 +132,9 @@ class MOZ_STACK_CLASS ContentEventHandler {
  
    explicit ContentEventHandler(nsPresContext* aPresContext);
  
@@ -22,7 +30,7 @@ index e383b6c7c97d..4ad82617e4c3 100644
    // Handle aEvent in the current process.
    MOZ_CAN_RUN_SCRIPT nsresult
    HandleQueryContentEvent(WidgetQueryContentEvent* aEvent);
-@@ -147,7 +153,8 @@ class MOZ_STACK_CLASS ContentEventHandler {
+@@ -147,7 +154,8 @@ class MOZ_STACK_CLASS ContentEventHandler {
    OnQueryTextRectArray(WidgetQueryContentEvent* aEvent);
    // eQueryEditorRect event handler
    MOZ_CAN_RUN_SCRIPT nsresult
@@ -32,7 +40,7 @@ index e383b6c7c97d..4ad82617e4c3 100644
    // eQueryContentState event handler
    MOZ_CAN_RUN_SCRIPT nsresult
    OnQueryContentState(WidgetQueryContentEvent* aEvent);
-@@ -165,7 +172,9 @@ class MOZ_STACK_CLASS ContentEventHandler {
+@@ -165,7 +173,9 @@ class MOZ_STACK_CLASS ContentEventHandler {
    OnQueryDropTargetHittest(WidgetQueryContentEvent* aEvent);
  
    // NS_SELECTION_* event
@@ -43,3 +51,16 @@ index e383b6c7c97d..4ad82617e4c3 100644
  
   protected:
    RefPtr<dom::Document> mDocument;
+@@ -472,7 +482,11 @@ class MOZ_STACK_CLASS ContentEventHandler {
+   nsresult AdjustCollapsedRangeMaybeIntoTextNode(SimpleRange& aSimpleRange);
+   // Convert the frame relative offset to be relative to the root frame of the
+   // root presContext (but still measured in appUnits of aFrame's presContext).
+-  nsresult ConvertToRootRelativeOffset(nsIFrame* aFrame, nsRect& aRect);
++  // When requested, also return the transform in device pixels.
++  nsresult ConvertToRootRelativeOffset(
++      nsIFrame* aFrame, nsRect& aRect,
++      Maybe<gfx::Matrix>* aTransform = nullptr);
++
+   // Expand aXPOffset to the nearest offset in cluster boundary. aForward is
+   // true, it is expanded to forward.
+   // FYI: Due to `nsFrameSelection::GetFrameForNodeOffset()`, this cannot

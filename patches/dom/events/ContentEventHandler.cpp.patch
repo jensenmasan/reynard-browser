@@ -1,5 +1,5 @@
 diff --git a/dom/events/ContentEventHandler.cpp b/dom/events/ContentEventHandler.cpp
-index d11a218cd050..6181ef47000d 100644
+index d11a218cd050..893caf3120cb 100644
 --- a/dom/events/ContentEventHandler.cpp
 +++ b/dom/events/ContentEventHandler.cpp
 @@ -6,43 +6,59 @@
@@ -62,7 +62,7 @@ index d11a218cd050..6181ef47000d 100644
  #include "nsTextFrame.h"
  
  // Work around conflicting define in rpcndr.h
-@@ -443,6 +459,1083 @@ Result<nsRange*, nsresult> ContentEventHandler::InitRootContent(
+@@ -443,6 +459,1101 @@ Result<nsRange*, nsresult> ContentEventHandler::InitRootContent(
    return rangeInRootElement;
  }
  
@@ -197,23 +197,39 @@ index d11a218cd050..6181ef47000d 100644
 +  // Convert frame app unit to root widget device pixel, then account
 +  // for the visual viewport.
 +  auto visualRect = [&](nsIFrame* aFrame, nsRect aRect,
-+                        LayoutDeviceIntRect& aResult,
-+                        nsTArray<NativeTextInputScrollReference>* aReferences =
-+                            nullptr) -> nsresult {
-+    nsresult result = ConvertToRootRelativeOffset(aFrame, aRect);
-+    NS_ENSURE_SUCCESS(result, result);
++                        NativeTextInputRect& aResult) -> nsresult {
 +    nsPresContext* context = aFrame->PresContext();
-+    aResult = LayoutDeviceIntRect::FromAppUnitsToOutside(
++    aResult.mUntransformedRect =
++        LayoutDeviceRect::FromAppUnits(aRect, context->AppUnitsPerDevPixel());
++    Maybe<gfx::Matrix> transform;
++    nsresult result = ConvertToRootRelativeOffset(aFrame, aRect, &transform);
++    NS_ENSURE_SUCCESS(result, result);
++    aResult.mRect = LayoutDeviceIntRect::FromAppUnitsToOutside(
 +        aRect, context->AppUnitsPerDevPixel());
 +    if (nsPresContext* root =
 +            context->GetInProcessRootContentDocumentPresContext()) {
-+      aResult = RoundedOut(ViewportUtils::DocumentRelativeLayoutToVisual(
-+          aResult, root->PresShell()));
++      aResult.mRect = RoundedOut(ViewportUtils::DocumentRelativeLayoutToVisual(
++          aResult.mRect, root->PresShell()));
++      if (transform) {
++        auto* scroll = root->PresShell()->GetRootScrollContainerFrame();
++        const auto visualToLayout =
++            ViewportUtils::GetVisualToLayoutTransform<LayoutDevicePixel>(
++                scroll ? scroll->GetContent() : nullptr);
++        gfx::Matrix viewport;
++        if (visualToLayout.Inverse().Is2D(&viewport)) {
++          *transform *= viewport;
++        } else {
++          transform.reset();
++        }
++      }
 +    }
 +
-+    if (aReferences) {
-+      CollectNativeScrollReferences(aFrame, *aReferences);
++    if (transform) {
++      aResult.mTransform = *transform;
++    } else {
++      aResult.mUntransformedRect = LayoutDeviceRect(aResult.mRect);
 +    }
++    CollectNativeScrollReferences(aFrame, aResult.mScrollReferences);
 +    return NS_OK;
 +  };
 +
@@ -256,8 +272,7 @@ index d11a218cd050..6181ef47000d 100644
 +    aRect.mRTL =
 +        frame->GetEmbeddingLevel().Direction() == intl::BidiDirection::RTL;
 +    aRect.mVertical = frame->GetWritingMode().IsVertical();
-+    return visualRect(frame.mFrame, rect, aRect.mRect,
-+                      &aRect.mScrollReferences);
++    return visualRect(frame.mFrame, rect, aRect);
 +  };
 +
 +  if (aRequest.mQuery == NativeTextInputQuery::State ||
@@ -369,8 +384,9 @@ index d11a218cd050..6181ef47000d 100644
 +      rv = caretAtOffset(aRequest.mOffset, aRequest.mAssociateWithNext, caret);
 +      NS_ENSURE_SUCCESS(rv, rv);
 +      aReply.mRect = caret.mRect;
-+      aReply.mScrollReferences = std::move(caret.mScrollReferences);
++      aReply.mScrollReferences = caret.mScrollReferences.Clone();
 +      aReply.mRTL = caret.mRTL;
++      aReply.mCaretRects.AppendElement(std::move(caret));
 +      break;
 +    }
 +    case NativeTextInputQuery::SelectionRects:
@@ -637,8 +653,7 @@ index d11a218cd050..6181ef47000d 100644
 +            rect = highlight.GetPhysicalRect(writingMode, size);
 +          }
 +
-+          rv = visualRect(rectFrame, rect, selectionRect.mRect,
-+                          &selectionRect.mScrollReferences);
++          rv = visualRect(rectFrame, rect, selectionRect);
 +          NS_ENSURE_SUCCESS(rv, rv);
 +
 +          // Join fully selected lines into one highlight. Join other rects only
@@ -654,8 +669,11 @@ index d11a218cd050..6181ef47000d 100644
 +              mergeRects = previous.mRect.Intersects(selectionRect.mRect);
 +            }
 +
-+            if (mergeRects) {
++            if (mergeRects &&
++                previous.mTransform.ExactlyEquals(selectionRect.mTransform)) {
 +              previous.mRect = previous.mRect.Union(selectionRect.mRect);
++              previous.mUntransformedRect = previous.mUntransformedRect.Union(
++                  selectionRect.mUntransformedRect);
 +              previous.mStartOffset =
 +                  std::min(previous.mStartOffset, selectionRect.mStartOffset);
 +              previous.mEndOffset =
@@ -1146,7 +1164,7 @@ index d11a218cd050..6181ef47000d 100644
  nsresult ContentEventHandler::InitCommon(EventMessage aEventMessage,
                                           SelectionType aSelectionType,
                                           bool aRequireFlush) {
-@@ -628,6 +1721,13 @@ nsresult ContentEventHandler::QueryContentRect(
+@@ -628,6 +1739,13 @@ nsresult ContentEventHandler::QueryContentRect(
  
    aEvent->mReply->mRect = LayoutDeviceIntRect::FromAppUnitsToOutside(
        resultRect, presContext->AppUnitsPerDevPixel());
@@ -1160,7 +1178,7 @@ index d11a218cd050..6181ef47000d 100644
    // Returning empty rect may cause native IME confused, let's make sure to
    // return non-empty rect.
    EnsureNonEmptyRect(aEvent->mReply->mRect);
-@@ -635,6 +1735,32 @@ nsresult ContentEventHandler::QueryContentRect(
+@@ -635,6 +1753,32 @@ nsresult ContentEventHandler::QueryContentRect(
    return NS_OK;
  }
  
@@ -1193,7 +1211,7 @@ index d11a218cd050..6181ef47000d 100644
  // Editor places a padding <br> element under its root content if the editor
  // doesn't have any text. This happens even for single line editors.
  // When we get text content and when we change the selection,
-@@ -2525,6 +3651,7 @@ nsresult ContentEventHandler::OnQueryTextRect(WidgetQueryContentEvent* aEvent) {
+@@ -2525,6 +3669,7 @@ nsresult ContentEventHandler::OnQueryTextRect(WidgetQueryContentEvent* aEvent) {
    }
    DOMRangeAndAdjustedOffsetInFlattenedText domRangeAndAdjustedOffset =
        domRangeAndAdjustedOffsetOrError.unwrap();
@@ -1201,7 +1219,7 @@ index d11a218cd050..6181ef47000d 100644
    nsString string;
    if (NS_WARN_IF(NS_FAILED(
            GenerateFlatTextContent(domRangeAndAdjustedOffset.mRange, string)))) {
-@@ -2847,7 +3974,7 @@ nsresult ContentEventHandler::OnQueryTextRect(WidgetQueryContentEvent* aEvent) {
+@@ -2847,7 +3992,7 @@ nsresult ContentEventHandler::OnQueryTextRect(WidgetQueryContentEvent* aEvent) {
  }
  
  nsresult ContentEventHandler::OnQueryEditorRect(
@@ -1210,7 +1228,7 @@ index d11a218cd050..6181ef47000d 100644
    nsresult rv = Init(aEvent);
    if (NS_FAILED(rv)) {
      return rv;
-@@ -2862,9 +3989,72 @@ nsresult ContentEventHandler::OnQueryEditorRect(
+@@ -2862,9 +4007,72 @@ nsresult ContentEventHandler::OnQueryEditorRect(
      }
    }
  
@@ -1224,7 +1242,7 @@ index d11a218cd050..6181ef47000d 100644
 +          GetFocusedTextControlFrameForRoot(mRootElement)) {
 +    editorContent = control->GetContent();
 +    editorFrame = control->GetScrollTargetFrame();
-   }
++  }
 +#endif
 +  rv = QueryContentRect(editorContent, aEvent);
 +  NS_ENSURE_SUCCESS(rv, rv);
@@ -1280,12 +1298,23 @@ index d11a218cd050..6181ef47000d 100644
 +
 +    // Preserve an empty clip when the editor is entirely out of view.
 +    aEvent->mReply->mRect = aEvent->mReply->mRect.Intersect(clipRect);
-+  }
+   }
 +#endif
  
    MOZ_ASSERT(aEvent->Succeeded());
    return NS_OK;
-@@ -3416,13 +4606,63 @@ nsresult ContentEventHandler::ConvertToRootRelativeOffset(nsIFrame* aFrame,
+@@ -3407,8 +4615,8 @@ nsresult ContentEventHandler::AdjustCollapsedRangeMaybeIntoTextNode(
+   return NS_OK;
+ }
+ 
+-nsresult ContentEventHandler::ConvertToRootRelativeOffset(nsIFrame* aFrame,
+-                                                          nsRect& aRect) {
++nsresult ContentEventHandler::ConvertToRootRelativeOffset(
++    nsIFrame* aFrame, nsRect& aRect, Maybe<gfx::Matrix>* aTransform) {
+   NS_ASSERTION(aFrame, "aFrame must not be null");
+ 
+   nsPresContext* thisPC = aFrame->PresContext();
+@@ -3416,12 +4624,76 @@ nsresult ContentEventHandler::ConvertToRootRelativeOffset(nsIFrame* aFrame,
    if (NS_WARN_IF(!rootPC)) {
      return NS_ERROR_FAILURE;
    }
@@ -1296,8 +1325,12 @@ index d11a218cd050..6181ef47000d 100644
      return NS_ERROR_FAILURE;
    }
  
-   aRect = nsLayoutUtils::TransformFrameRectToAncestor(aFrame, aRect, rootFrame);
- 
+-  aRect = nsLayoutUtils::TransformFrameRectToAncestor(aFrame, aRect, rootFrame);
++  Maybe<gfx::Matrix4x4Flagged> matrix;
++  aRect = nsLayoutUtils::TransformFrameRectToAncestor(
++      aFrame, aRect, rootFrame, nullptr, aTransform ? &matrix : nullptr);
++  const nsPoint transformedOrigin = aRect.TopLeft();
++
 +  const auto& fixedMargins = rootPresShell->GetFixedPositionMargins();
 +  if (fixedMargins && rootPC->IsKeyboardHiddenOrResizesContentMode() &&
 +      nsDisplayOwnLayer::HasDynamicToolbar(rootFrame)) {
@@ -1347,10 +1380,20 @@ index d11a218cd050..6181ef47000d 100644
 +    aRect.y += offset;
 +  }
 +
++  if (aTransform) {
++    aTransform->reset();
++    gfx::Matrix affine;
++    if (matrix && matrix->CanDraw2D(&affine)) {
++      const LayoutDevicePoint offset = LayoutDevicePoint::FromAppUnits(
++          aRect.TopLeft() - transformedOrigin, rootPC->AppUnitsPerDevPixel());
++      affine.PostTranslate(offset.x, offset.y);
++      *aTransform = Some(affine);
++    }
++  }
+ 
    // TransformFrameRectToAncestor returned the rect in the ancestor's appUnits,
    // but we want it in aFrame's units (in case of different full-zoom factors),
-   // so convert back.
-@@ -3481,7 +4721,8 @@ static void AdjustRangeForSelection(const Element* aRootElement,
+@@ -3481,7 +4753,8 @@ static void AdjustRangeForSelection(const Element* aRootElement,
    }
  }
  
@@ -1360,7 +1403,7 @@ index d11a218cd050..6181ef47000d 100644
    aEvent->mSucceeded = false;
  
    // Get selection to manipulate
-@@ -3533,6 +4774,19 @@ nsresult ContentEventHandler::OnSelectionEvent(WidgetSelectionEvent* aEvent) {
+@@ -3533,6 +4806,19 @@ nsresult ContentEventHandler::OnSelectionEvent(WidgetSelectionEvent* aEvent) {
      }
    }
  
@@ -1380,7 +1423,7 @@ index d11a218cd050..6181ef47000d 100644
    if (aEvent->mReversed) {
      nsCOMPtr<nsINode> startNodeStrong(startNode);
      nsCOMPtr<nsINode> endNodeStrong(endNode);
-@@ -3558,7 +4812,8 @@ nsresult ContentEventHandler::OnSelectionEvent(WidgetSelectionEvent* aEvent) {
+@@ -3558,7 +4844,8 @@ nsresult ContentEventHandler::OnSelectionEvent(WidgetSelectionEvent* aEvent) {
    // `ContentEventHandler` is a `MOZ_STACK_CLASS`, so `mSelection` is known to
    // be alive.
    MOZ_KnownLive(mSelection)
