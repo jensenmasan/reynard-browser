@@ -1,23 +1,54 @@
 diff --git a/dom/html/nsGenericHTMLElement.cpp b/dom/html/nsGenericHTMLElement.cpp
-index 1a77c71f0521..20c0450041ff 100644
+index 1a77c71f0521..4af1492cc3d9 100644
 --- a/dom/html/nsGenericHTMLElement.cpp
 +++ b/dom/html/nsGenericHTMLElement.cpp
-@@ -915,8 +915,12 @@ void nsGenericHTMLElement::AfterSetAttr(int32_t aNamespaceID, nsAtom* aName,
+@@ -915,15 +915,30 @@ void nsGenericHTMLElement::AfterSetAttr(int32_t aNamespaceID, nsAtom* aName,
        } else {
          ClearHasName();
        }
 -    } else if (aName == nsGkAtoms::inputmode ||
 -               aName == nsGkAtoms::enterkeyhint) {
+-      if (nsFocusManager::GetFocusedElementStatic() == this) {
 +    } else if (aName == nsGkAtoms::inputmode || aName == nsGkAtoms::enterkeyhint
 +#ifdef XP_IOS
 +               || aName == nsGkAtoms::autocorrect ||
-+               aName == nsGkAtoms::autocapitalize
++               aName == nsGkAtoms::autocapitalize ||
++               aName == nsGkAtoms::writingsuggestions
 +#endif
 +    ) {
-       if (nsFocusManager::GetFocusedElementStatic() == this) {
++      const RefPtr<nsGenericHTMLElement> focusedElement =
++          FromNode(nsFocusManager::GetFocusedElementStatic());
++      bool updateIME = focusedElement == this;
++#ifdef XP_IOS
++      if (aName == nsGkAtoms::writingsuggestions && focusedElement) {
++        updateIME = focusedElement->IsInclusiveDescendantOf(this);
++      }
++#endif
++
++      if (updateIME) {
          if (const nsPresContext* presContext =
-                 GetPresContext(eForComposedDoc)) {
-@@ -2580,12 +2584,23 @@ EditorBase* nsGenericHTMLElement::GetAssociatedExtantEditor() const {
+-                GetPresContext(eForComposedDoc)) {
++                focusedElement->GetPresContext(eForComposedDoc)) {
+           IMEContentObserver* observer =
+               IMEStateManager::GetActiveContentObserver();
+-          if (observer && observer->IsObserving(*presContext, this)) {
+-            if (const RefPtr<EditorBase> editorBase = GetExtantEditor()) {
++          if (observer && observer->IsObserving(*presContext, focusedElement)) {
++            if (const RefPtr<EditorBase> editorBase =
++                    focusedElement->GetExtantEditor()) {
+               // If the TextControlState does not have a bound frame,
+               // TextEditor::GetPreferredIMEState() may fail.  In such case,
+               // TextEditor will update IME state when it's (re)initialized
+@@ -933,7 +948,7 @@ void nsGenericHTMLElement::AfterSetAttr(int32_t aNamespaceID, nsAtom* aName,
+               if (MOZ_LIKELY(newStateOrError.isOk())) {
+                 OwningNonNull<nsGenericHTMLElement> kungFuDeathGrip(*this);
+                 IMEStateManager::UpdateIMEState(
+-                    newStateOrError.unwrap(), kungFuDeathGrip, *editorBase,
++                    newStateOrError.unwrap(), focusedElement, *editorBase,
+                     {IMEStateManager::UpdateIMEStateOption::ForceUpdate,
+                      IMEStateManager::UpdateIMEStateOption::
+                          DontCommitComposition});
+@@ -2580,12 +2595,23 @@ EditorBase* nsGenericHTMLElement::GetAssociatedExtantEditor() const {
  void nsGenericHTMLElement::SyncSpellCheckerStateOfExtantEditorsOnSubtree(
      nsIContent& aContent) {
    /* Sync this node */

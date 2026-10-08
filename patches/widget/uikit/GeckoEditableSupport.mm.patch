@@ -1,9 +1,9 @@
 diff --git a/widget/uikit/GeckoEditableSupport.mm b/widget/uikit/GeckoEditableSupport.mm
 new file mode 100644
-index 000000000000..3bca48ae20a6
+index 000000000000..357533016880
 --- /dev/null
 +++ b/widget/uikit/GeckoEditableSupport.mm
-@@ -0,0 +1,3603 @@
+@@ -0,0 +1,3624 @@
 +/* This Source Code Form is subject to the terms of the Mozilla Public
 + * License, v. 2.0. If a copy of the MPL was not distributed with this
 + * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
@@ -3517,6 +3517,27 @@ index 000000000000..3bca48ae20a6
 +
 +  return UIKitUtils::GetUITextAutocorrectionType(
 +      mGeckoChild->GetInputContext());
++}
++
++- (UITextInlinePredictionType)inlinePredictionType API_AVAILABLE(ios(17.0)) {
++  if (!mGeckoChild || mGeckoChild->Destroyed()) {
++    return UITextInlinePredictionTypeNo;
++  }
++
++  if (!mGeckoChild->GetInputContext().mWritingSuggestionsEnabled) {
++    return UITextInlinePredictionTypeNo;
++  }
++
++  if (self.secureTextEntry) {
++    return UITextInlinePredictionTypeNo;
++  }
++
++  if (self.autocorrectionType == UITextAutocorrectionTypeNo) {
++    return UITextInlinePredictionTypeNo;
++  }
++
++  // UIKit disables default inline predictions for custom text views, so we cant use type default here.
++  return UITextInlinePredictionTypeYes;
 +}
 +
 +- (UITextSpellCheckingType)spellCheckingType {
