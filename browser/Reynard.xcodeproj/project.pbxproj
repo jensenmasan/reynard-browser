@@ -89,7 +89,7 @@
 			);
 			target = 01GECKO0012F2F289C001F0002 /* GeckoView */;
 		};
-		0111ED052F4A1A5900490C82 /* Exceptions for "Helper" folder in "马老师专属 Helper" target */ = {
+		0111ED052F4A1A5900490C82 /* Exceptions for "Helper" folder in "Reynard Helper" target */ = {
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
 				Helper.swift,
@@ -134,7 +134,7 @@
 			isa = PBXFileSystemSynchronizedRootGroup;
 			exceptions = (
 				0111ED022F4A19FD00490C82 /* Exceptions for "Helper" folder in "GeckoView" target */,
-				0111ED052F4A1A5900490C82 /* Exceptions for "Helper" folder in "马老师专属 Helper" target */,
+				0111ED052F4A1A5900490C82 /* Exceptions for "Helper" folder in "Reynard Helper" target */,
 			);
 			path = Helper;
 			sourceTree = "<group>";
@@ -296,7 +296,7 @@
 		};
 		02WCPTGT2F3000000000001 /* Reynard Helper */ = {
 			isa = PBXNativeTarget;
-			buildConfigurationList = 02WCPCFG2F3000000000001 /* Build configuration list for PBXNativeTarget "马老师专属 Helper" */;
+			buildConfigurationList = 02WCPCFG2F3000000000001 /* Build configuration list for PBXNativeTarget "Reynard Helper" */;
 			buildPhases = (
 				02WCPSRC2F3000000000001 /* Sources */,
 				02WCPFRM2F3000000000001 /* Frameworks */,
@@ -307,7 +307,7 @@
 			dependencies = (
 				0111EC292F48431600490C82 /* PBXTargetDependency */,
 			);
-			name = "马老师专属 Helper";
+			name = "Reynard Helper";
 			packageProductDependencies = (
 			);
 			productName = WebContentProcess;
@@ -886,7 +886,7 @@
 				ENABLE_DEBUG_DYLIB = NO;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = Helper/Info.plist;
-				INFOPLIST_KEY_CFBundleDisplayName = "马老师专属 Helper";
+				INFOPLIST_KEY_CFBundleDisplayName = "Reynard Helper";
 				IPHONEOS_DEPLOYMENT_TARGET = "$(IPHONEOS_DEPLOYMENT_TARGET)";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -934,7 +934,7 @@
 				DEVELOPMENT_TEAM = NAR5D6HWAD;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = Helper/Info.plist;
-				INFOPLIST_KEY_CFBundleDisplayName = "马老师专属 Helper";
+				INFOPLIST_KEY_CFBundleDisplayName = "Reynard Helper";
 				IPHONEOS_DEPLOYMENT_TARGET = "$(IPHONEOS_DEPLOYMENT_TARGET)";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -1076,7 +1076,7 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
-		02WCPCFG2F3000000000001 /* Build configuration list for PBXNativeTarget "马老师专属 Helper" */ = {
+		02WCPCFG2F3000000000001 /* Build configuration list for PBXNativeTarget "Reynard Helper" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				02WCPDBG2F3000000000001 /* Debug */,
