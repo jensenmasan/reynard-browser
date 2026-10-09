@@ -43,8 +43,35 @@ fi
 # I absolutely hate Apple for this
 # Why is my bundle identifier just become unavailable for no reason?
 plutil -replace CFBundleIdentifier -string "com.malaoshi.Reynard" "$APP_PATH/Info.plist"
-plutil -replace CFBundleIdentifier -string "com.malaoshi.Reynard.Helper" "$APP_PATH/PlugIns/Reynard Helper.appex/Info.plist"
-plutil -replace CFBundleIdentifier -string "com.malaoshi.Reynard.OpenIn" "$APP_PATH/PlugIns/OpenIn.appex/Info.plist"
+
+# The helper extension is renamed together with the app, so its bundle ends up
+# being called "马老师专属 Helper.appex" instead of "Reynard Helper.appex".
+# Discover the extension bundles dynamically rather than hardcoding product names.
+HELPER_APPEX=""
+for APPEX in "$APP_PATH"/PlugIns/*.appex; do
+	[ -d "$APPEX" ] || continue
+	APPEX_NAME="$(basename "$APPEX" .appex)"
+	case "$APPEX_NAME" in
+		*Helper*)
+			HELPER_APPEX="$APPEX"
+			plutil -replace CFBundleIdentifier -string "com.malaoshi.Reynard.Helper" "$APPEX/Info.plist"
+			;;
+		*OpenIn*)
+			plutil -replace CFBundleIdentifier -string "com.malaoshi.Reynard.OpenIn" "$APPEX/Info.plist"
+			;;
+		*)
+			echo "Unexpected app extension bundle: $APPEX_NAME" >&2
+			exit 1
+			;;
+	esac
+done
+
+if [ -z "$HELPER_APPEX" ]; then
+	echo "Helper app extension not found in $APP_PATH/PlugIns"
+	exit 1
+fi
+
+HELPER_APPEX_NAME="$(basename "$HELPER_APPEX" .appex)"
 
 rm -rf "$WORK_DIR" "$ROOT_DIR/dist/$OUTPUT_NAME"
 mkdir -p "$WORK_DIR/Payload"
@@ -67,7 +94,7 @@ if [ "$BUILD_TYPE" != "normal" ]; then
 	chmod 0755 "$PTRACE_JIT_OUT"
 	ldid -S"$ROOT_DIR/browser/Reynard/JIT/Unsandboxed/ptrace_jit.entitlements" "$PTRACE_JIT_OUT"
 	ldid -S"$ROOT_DIR/browser/Reynard/Entitlements/Reynard.private.entitlements" "Payload/Reynard.app/Reynard"
-	ldid -S"$ROOT_DIR/browser/Helper/Entitlements/Reynard-Helper.private.entitlements" "Payload/Reynard.app/PlugIns/Reynard Helper.appex/Reynard Helper"
+	ldid -S"$ROOT_DIR/browser/Helper/Entitlements/Reynard-Helper.private.entitlements" "Payload/Reynard.app/PlugIns/$HELPER_APPEX_NAME/$HELPER_APPEX_NAME"
 fi
 
 if [ "$BUILD_TYPE" = "--jailbroken" ]; then
