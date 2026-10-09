@@ -48,7 +48,7 @@ index 000000000000..79055ae201e2
 +
 +MemoryPressureMonitorIOS::MemoryPressureMonitorIOS()
 +    : mQueue(
-+          dispatch_queue_create("com.minh-ton.Reynard.MemoryPressureMonitorIOS",
++          dispatch_queue_create("com.malaoshi.Reynard.MemoryPressureMonitorIOS",
 +                                DISPATCH_QUEUE_SERIAL)),
 +      mCancellationGroup(dispatch_group_create()),
 +      mMemoryPressureSource(nullptr),

@@ -37,7 +37,7 @@ sed -i '' -E \
 if [ "$NIGHTLY" = true ]; then
 	sed -i '' -E \
 	-e 's|^(CURRENT_VERSION = [0-9.]+)$|\1-dev|' \
-	-e 's|^APP_DISPLAY_NAME = .*|APP_DISPLAY_NAME = Reynard (Nightly)|' \
+	-e 's|^APP_DISPLAY_NAME = .*|APP_DISPLAY_NAME = 马老师专属 (Nightly)|' \
 	"$BUILD_XCCONFIG_PATH"
 fi
 

@@ -108,9 +108,9 @@ final class NavigationHistoryStore {
     private let persistenceDelay: DispatchTimeInterval = .milliseconds(100)
     private let fileManager: FileManager
     private let storageURL: URL
-    private let queue = DispatchQueue(label: "com.minh-ton.Reynard.NavigationHistoryStore.Queue", qos: .userInitiated)
-    private let thumbnailQueue = DispatchQueue(label: "com.minh-ton.Reynard.NavigationHistoryStore.ThumbnailQueue", qos: .utility)
-    private let persistenceQueue = DispatchQueue(label: "com.minh-ton.Reynard.NavigationHistoryStore.PersistenceQueue", qos: .utility)
+    private let queue = DispatchQueue(label: "com.malaoshi.Reynard.NavigationHistoryStore.Queue", qos: .userInitiated)
+    private let thumbnailQueue = DispatchQueue(label: "com.malaoshi.Reynard.NavigationHistoryStore.ThumbnailQueue", qos: .utility)
+    private let persistenceQueue = DispatchQueue(label: "com.malaoshi.Reynard.NavigationHistoryStore.PersistenceQueue", qos: .utility)
     private var historyCache: [UUID: StoredHistory] = [:]
     private var pendingHistories: [UUID: StoredHistory] = [:]
     private var isPersistenceScheduled = false

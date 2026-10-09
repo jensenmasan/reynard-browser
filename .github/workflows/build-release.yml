@@ -7,8 +7,8 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: Existing tag
-        required: true
+        description: Existing tag (leave empty to build current branch)
+        required: false
         type: string
 
 permissions:
@@ -18,32 +18,8 @@ jobs:
   build:
     uses: ./.github/workflows/build.yml
     with:
-      checkout_ref: ${{ github.event_name == 'push' && github.sha || inputs.tag }}
+      checkout_ref: ${{ inputs.tag || github.sha }}
       build_normal_ipa: true
       build_trollstore_tipa: true
-      build_jailbroken_ipa: true
+      build_jailbroken_ipa: false
 
-  release:
-    name: Create release
-    needs: build
-    runs-on: ubuntu-latest
-    permissions:
-      contents: write
-    steps:
-      - name: Download release artifacts
-        uses: actions/download-artifact@v4
-        with:
-          path: dist
-          merge-multiple: true
-
-      - name: Create or update release
-        uses: softprops/action-gh-release@v3
-        with:
-          tag_name: ${{ github.event_name == 'push' && github.ref_name || inputs.tag }}
-          token: ${{ secrets.RELEASE_TOKEN }}
-          draft: true
-          fail_on_unmatched_files: true
-          files: |
-            dist/Reynard.ipa
-            dist/Reynard-TrollStore.tipa
-            dist/Reynard-Jailbroken.ipa

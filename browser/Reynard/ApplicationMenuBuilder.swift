@@ -49,7 +49,7 @@ enum ApplicationMenuBuilder {
         
         let historyMenu = UIMenu(
             title: NSLocalizedString("History", comment: ""),
-            identifier: UIMenu.Identifier("com.minh-ton.Reynard.ApplicationMenu.History"),
+            identifier: UIMenu.Identifier("com.malaoshi.Reynard.ApplicationMenu.History"),
             children: [
                 UIKeyCommand(title: NSLocalizedString("Back", comment: ""), action: #selector(BrowserViewController.goBackKeyCommand(_:)), input: "[", modifierFlags: .command),
                 UIKeyCommand(title: NSLocalizedString("Forward", comment: ""), action: #selector(BrowserViewController.goForwardKeyCommand(_:)), input: "]", modifierFlags: .command),
@@ -61,14 +61,14 @@ enum ApplicationMenuBuilder {
         
         let bookmarksMenu = UIMenu(
             title: NSLocalizedString("Bookmarks", comment: ""),
-            identifier: UIMenu.Identifier("com.minh-ton.Reynard.ApplicationMenu.Bookmarks"),
+            identifier: UIMenu.Identifier("com.malaoshi.Reynard.ApplicationMenu.Bookmarks"),
             children: [
                 UIKeyCommand(title: NSLocalizedString("Show Bookmarks", comment: ""), action: #selector(BrowserViewController.showBookmarksKeyCommand(_:)), input: "o", modifierFlags: [.command, .shift]),
                 UIKeyCommand(title: NSLocalizedString("Add Bookmark", comment: ""), action: #selector(BrowserViewController.addBookmarkKeyCommand(_:)), input: "d", modifierFlags: .command),
                 UIKeyCommand(title: NSLocalizedString("Edit Bookmarks", comment: ""), action: #selector(BrowserViewController.editBookmarksKeyCommand(_:)), input: "b", modifierFlags: [.alternate, .command]),
             ]
         )
-        builder.insertSibling(bookmarksMenu, afterMenu: UIMenu.Identifier("com.minh-ton.Reynard.ApplicationMenu.History"))
+        builder.insertSibling(bookmarksMenu, afterMenu: UIMenu.Identifier("com.malaoshi.Reynard.ApplicationMenu.History"))
         
         let tabCommands = (1...9).map { number in
             UIKeyCommand(

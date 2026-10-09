@@ -21,7 +21,7 @@ final class PagePrintActivity: UIActivity {
     
     override class var activityCategory: UIActivity.Category { .action }
     override var activityType: UIActivity.ActivityType? {
-        UIActivity.ActivityType("com.minh-ton.Reynard.PagePrintActivity")
+        UIActivity.ActivityType("com.malaoshi.Reynard.PagePrintActivity")
     }
     override var activityTitle: String? { NSLocalizedString("Print", comment: "") }
     override var activityImage: UIImage? { UIImage(named: "reynard.printer") }

@@ -13,8 +13,8 @@ enum AddressBarMenu {
     }
     
     private struct Identifier {
-        static let addressBarMenu = UIMenu.Identifier("com.minh-ton.Reynard.AddressBarMenu")
-        static let manageAddonsMenu = UIMenu.Identifier("com.minh-ton.Reynard.AddressBarMenu.ManageAddons")
+        static let addressBarMenu = UIMenu.Identifier("com.malaoshi.Reynard.AddressBarMenu")
+        static let manageAddonsMenu = UIMenu.Identifier("com.malaoshi.Reynard.AddressBarMenu.ManageAddons")
     }
     
     struct AddonItem {

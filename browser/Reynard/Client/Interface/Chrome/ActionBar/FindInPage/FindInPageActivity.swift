@@ -9,7 +9,7 @@ import UIKit
 
 @MainActor
 final class FindInPageActivity: UIActivity {
-    static let identifier = UIActivity.ActivityType("com.minh-ton.Reynard.FindInPageActivity")
+    static let identifier = UIActivity.ActivityType("com.malaoshi.Reynard.FindInPageActivity")
     private let url: URL
     
     init(url: URL) {

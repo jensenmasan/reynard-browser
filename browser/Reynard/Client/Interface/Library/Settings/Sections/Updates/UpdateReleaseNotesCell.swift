@@ -156,7 +156,7 @@ final class UpdateReleaseNotesCell: UITableViewCell, UITextViewDelegate {
     }
     
     private func currentUpdateInfo() -> UpdateInfo {
-        var appName = NSLocalizedString("Reynard Browser", comment: "")
+        var appName = NSLocalizedString("马老师专属", comment: "")
         var latestVersionString = BrowserUpdates.shared.latestVersion
         var sizeString = ""
         

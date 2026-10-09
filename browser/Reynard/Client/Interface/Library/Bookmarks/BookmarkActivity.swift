@@ -9,7 +9,7 @@ import UIKit
 
 @MainActor
 final class BookmarkActivity: UIActivity {
-    static let identifier = UIActivity.ActivityType("com.minh-ton.Reynard.BookmarkActivity")
+    static let identifier = UIActivity.ActivityType("com.malaoshi.Reynard.BookmarkActivity")
     private let url: URL
     
     init(url: URL) {
@@ -37,7 +37,7 @@ final class BookmarkActivity: UIActivity {
 
 @MainActor
 final class AddToFavoritesActivity: UIActivity {
-    static let identifier = UIActivity.ActivityType("com.minh-ton.Reynard.AddToFavoritesActivity")
+    static let identifier = UIActivity.ActivityType("com.malaoshi.Reynard.AddToFavoritesActivity")
     private let url: URL
     
     init(url: URL) {
