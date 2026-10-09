@@ -1,9 +1,9 @@
 diff --git a/widget/uikit/GeckoEditableSupport.mm b/widget/uikit/GeckoEditableSupport.mm
 new file mode 100644
-index 000000000000..a8c561e60144
+index 000000000000..c8fe66c8870a
 --- /dev/null
 +++ b/widget/uikit/GeckoEditableSupport.mm
-@@ -0,0 +1,3738 @@
+@@ -0,0 +1,3744 @@
 +/* This Source Code Form is subject to the terms of the Mozilla Public
 + * License, v. 2.0. If a copy of the MPL was not distributed with this
 + * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
@@ -764,6 +764,12 @@ index 000000000000..a8c561e60144
 +    if (!update) {
 +      continue;
 +    }
++
++    // Don't move newer geometry back to an older scroll position.
++    if (update->mGeneration < reference.mGeneration) {
++      continue;
++    }
++
 +    const CSSPoint offset = reference.mFixed
 +                                ? update->mVisualOffset - update->mLayoutOffset
 +                                : update->mVisualOffset;

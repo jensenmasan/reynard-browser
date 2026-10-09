@@ -1,5 +1,5 @@
 diff --git a/gfx/layers/apz/src/AsyncPanZoomController.cpp b/gfx/layers/apz/src/AsyncPanZoomController.cpp
-index c50cce23a949..6957aece31e2 100644
+index c50cce23a949..26f4bb51a412 100644
 --- a/gfx/layers/apz/src/AsyncPanZoomController.cpp
 +++ b/gfx/layers/apz/src/AsyncPanZoomController.cpp
 @@ -41,9 +41,10 @@
@@ -112,7 +112,7 @@ index c50cce23a949..6957aece31e2 100644
        request.GetPresShellResolution() ==
            mLastPaintRequestMetrics.GetPresShellResolution() &&
        request.GetZoom() == mLastPaintRequestMetrics.GetZoom() &&
-@@ -5310,6 +5351,41 @@ CSSToParentLayerScale AsyncPanZoomController::GetEffectiveZoom(
+@@ -5310,6 +5351,42 @@ CSSToParentLayerScale AsyncPanZoomController::GetEffectiveZoom(
    return Metrics().GetZoom();
  }
  
@@ -122,6 +122,7 @@ index c50cce23a949..6957aece31e2 100644
 +  RecursiveMutexAutoLock lock(mRecursiveMutex);
 +  NativeTextInputScrollUpdate update;
 +  update.mGuid = GetGuid();
++  update.mGeneration = Metrics().GetScrollGeneration();
 +  update.mVisualOffset = GetEffectiveScrollOffset(eForCompositing, lock);
 +  update.mLayoutOffset =
 +      GetEffectiveLayoutViewport(eForCompositing, lock).TopLeft();
@@ -154,7 +155,7 @@ index c50cce23a949..6957aece31e2 100644
  void AsyncPanZoomController::AdvanceToNextSample() {
    AssertOnSamplerThread();
    RecursiveMutexAutoLock lock(mRecursiveMutex);
-@@ -5633,12 +5709,18 @@ void AsyncPanZoomController::NotifyMainThreadTransaction(
+@@ -5633,12 +5710,18 @@ void AsyncPanZoomController::NotifyMainThreadTransaction(
    // XXX Suspicious comparison between layout and visual scroll offsets.
    // This may not do the right thing when we're zoomed in.
    CSSPoint lastScrollOffset = mLastContentPaintMetrics.GetLayoutScrollOffset();
@@ -178,7 +179,7 @@ index c50cce23a949..6957aece31e2 100644
    if (aScrollMetadata.DidContentGetPainted()) {
      mLastContentPaintMetadata = aScrollMetadata;
    }
-@@ -5693,7 +5775,7 @@ void AsyncPanZoomController::NotifyMainThreadTransaction(
+@@ -5693,7 +5776,7 @@ void AsyncPanZoomController::NotifyMainThreadTransaction(
    // TODO if we're in a drag and scrollOffsetUpdated is set then we want to
    // ignore it
  
@@ -187,7 +188,7 @@ index c50cce23a949..6957aece31e2 100644
    RepaintUpdateType contentRepaintType = RepaintUpdateType::eNone;
    bool viewportSizeUpdated = false;
    bool needToReclampScroll = false;
-@@ -5741,6 +5823,11 @@ void AsyncPanZoomController::NotifyMainThreadTransaction(
+@@ -5741,6 +5824,11 @@ void AsyncPanZoomController::NotifyMainThreadTransaction(
  
      mExpectedGeckoMetrics.UpdateFrom(aLayerMetrics);
  
@@ -199,7 +200,7 @@ index c50cce23a949..6957aece31e2 100644
      for (auto& sampledState : mSampledState) {
        sampledState.UpdateScrollProperties(Metrics());
        sampledState.UpdateZoomProperties(Metrics());
-@@ -5766,6 +5853,9 @@ void AsyncPanZoomController::NotifyMainThreadTransaction(
+@@ -5766,6 +5854,9 @@ void AsyncPanZoomController::NotifyMainThreadTransaction(
      // If we're not taking the aLayerMetrics wholesale we still need to pull
      // in some things into our local Metrics() because these things are
      // determined by Gecko and our copy in Metrics() may be stale.
@@ -209,7 +210,7 @@ index c50cce23a949..6957aece31e2 100644
  
      if (Metrics().GetLayoutViewport().Size() !=
          aLayerMetrics.GetLayoutViewport().Size()) {
-@@ -5854,6 +5944,20 @@ void AsyncPanZoomController::NotifyMainThreadTransaction(
+@@ -5854,6 +5945,20 @@ void AsyncPanZoomController::NotifyMainThreadTransaction(
            aLayerMetrics.GetCompositionSizeWithoutDynamicToolbar());
        needToReclampScroll = true;
      }
@@ -230,7 +231,7 @@ index c50cce23a949..6957aece31e2 100644
      if (Metrics().IsRootContent()) {
        // If the composition size changed, the compositor's layout viewport
        // offset may have changed (to keep the layout viewport enclosing the
-@@ -5970,7 +6074,8 @@ void AsyncPanZoomController::NotifyMainThreadTransaction(
+@@ -5970,7 +6075,8 @@ void AsyncPanZoomController::NotifyMainThreadTransaction(
                     "Smooth relative update should never happen");
          APZC_LOG("%p smooth scrolling to %s\n", this,
                   ToString(scrollUpdate.GetDestination()).c_str());
@@ -240,7 +241,7 @@ index c50cce23a949..6957aece31e2 100644
        }
  
        ScrollAnimationKind animationKind =
-@@ -6187,7 +6292,8 @@ void AsyncPanZoomController::NotifyMainThreadTransaction(
+@@ -6187,7 +6293,8 @@ void AsyncPanZoomController::NotifyMainThreadTransaction(
               ToString(aLayerMetrics.GetVisualDestination()).c_str(),
               (int)aLayerMetrics.GetVisualScrollUpdateType());
      bool offsetChanged = Metrics().ClampAndSetVisualScrollOffset(
@@ -250,7 +251,7 @@ index c50cce23a949..6957aece31e2 100644
  
      // If this is the first time we got metrics for this content (isDefault) and
      // the update type was none and the offset didn't change then we don't have
-@@ -6983,12 +7089,17 @@ Maybe<CSSSnapDestination> AsyncPanZoomController::FindSnapPointNear(
+@@ -6983,12 +7090,17 @@ Maybe<CSSSnapDestination> AsyncPanZoomController::FindSnapPointNear(
    APZC_LOG("%p scroll snapping near %s\n", this,
             ToString(aDestination).c_str());
    CSSRect scrollRange = Metrics().CalculateScrollRange();
@@ -272,7 +273,7 @@ index c50cce23a949..6957aece31e2 100644
      // GetSnapPointForDestination() can produce a destination that's outside
      // of the scroll frame's scroll range. Clamp it here (this matches the
      // behaviour of the main-thread code path, which clamps it in
-@@ -7257,9 +7368,60 @@ ScreenMargin AsyncPanZoomController::GetFixedLayerMargins(
+@@ -7257,9 +7369,60 @@ ScreenMargin AsyncPanZoomController::GetFixedLayerMargins(
    return mCompositorFixedLayerMargins;
  }
  

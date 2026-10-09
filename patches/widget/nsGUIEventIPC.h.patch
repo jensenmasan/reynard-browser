@@ -1,5 +1,5 @@
 diff --git a/widget/nsGUIEventIPC.h b/widget/nsGUIEventIPC.h
-index a2a73f583d28..20bf222b884b 100644
+index a2a73f583d28..b5530b2175a9 100644
 --- a/widget/nsGUIEventIPC.h
 +++ b/widget/nsGUIEventIPC.h
 @@ -16,6 +16,7 @@
@@ -31,8 +31,8 @@ index a2a73f583d28..20bf222b884b 100644
 +                                  mDirection, mOffset, mLength, mCount,
 +                                  mAssociateWithNext, mAnimated, mPoint, mText);
 +DEFINE_IPC_SERIALIZER_WITH_FIELDS(mozilla::NativeTextInputScrollReference,
-+                                  mGuid, mOffset, mXAxis, mYAxis, mOrigin,
-+                                  mZoom, mFixed);
++                                  mGuid, mGeneration, mOffset, mXAxis, mYAxis,
++                                  mOrigin, mZoom, mFixed);
 +DEFINE_IPC_SERIALIZER_WITH_FIELDS(mozilla::NativeTextInputRect, mRect,
 +                                  mUntransformedRect, mTransform, mStartOffset,
 +                                  mEndOffset, mRTL, mVertical, mContainsStart,
@@ -49,8 +49,8 @@ index a2a73f583d28..20bf222b884b 100644
 +                                  mScrollReferences, mClipRects, mCaretRects);
 +
 +DEFINE_IPC_SERIALIZER_WITH_FIELDS(mozilla::NativeTextInputScrollUpdate, mGuid,
-+                                  mVisualOffset, mLayoutOffset, mZoom,
-+                                  mScrolling);
++                                  mGeneration, mVisualOffset, mLayoutOffset,
++                                  mZoom, mScrolling);
 +
  template <>
  struct ParamTraits<mozilla::EventMessage>

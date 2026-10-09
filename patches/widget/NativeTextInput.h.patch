@@ -1,9 +1,9 @@
 diff --git a/widget/NativeTextInput.h b/widget/NativeTextInput.h
 new file mode 100644
-index 000000000000..d79b197f9bc8
+index 000000000000..afad227ffc22
 --- /dev/null
 +++ b/widget/NativeTextInput.h
-@@ -0,0 +1,133 @@
+@@ -0,0 +1,136 @@
 +/* This Source Code Form is subject to the terms of the Mozilla Public
 + * License, v. 2.0. If a copy of the MPL was not distributed with this
 + * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
@@ -15,6 +15,7 @@ index 000000000000..d79b197f9bc8
 +#define mozilla_NativeTextInput_h
 +
 +#include "Units.h"
++#include "mozilla/ScrollGeneration.h"
 +#include "mozilla/gfx/Matrix.h"
 +#include "mozilla/layers/ScrollableLayerGuid.h"
 +#include "nsColor.h"
@@ -74,6 +75,7 @@ index 000000000000..d79b197f9bc8
 +
 +struct NativeTextInputScrollReference {
 +  layers::ScrollableLayerGuid mGuid;
++  MainThreadScrollGeneration mGeneration;
 +  CSSPoint mOffset;
 +  LayoutDevicePoint mXAxis;
 +  LayoutDevicePoint mYAxis;
@@ -126,6 +128,7 @@ index 000000000000..d79b197f9bc8
 +
 +struct NativeTextInputScrollUpdate {
 +  layers::ScrollableLayerGuid mGuid;
++  MainThreadScrollGeneration mGeneration;
 +  CSSPoint mVisualOffset;
 +  CSSPoint mLayoutOffset;
 +  float mZoom = 1.0f;
