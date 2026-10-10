@@ -13,9 +13,6 @@ final class AboutSettingsSection {
         case experimentalFeatures
         case appVersion
         case engineVersion
-        case sourceCode
-        case supportProject
-        case githubProfile
     }
     
     private var showsExperimentalFeatures = false
@@ -58,12 +55,6 @@ final class AboutSettingsSection {
             return valueCell(title: NSLocalizedString("马老师专属", comment: ""), value: "\(version) (\(build))")
         case .engineVersion:
             return valueCell(title: NSLocalizedString("Engine Version", comment: ""), value: GeckoRuntime.version)
-        case .sourceCode:
-            return linkCell(title: NSLocalizedString("View Source Code", comment: ""))
-        case .supportProject:
-            return linkCell(title: NSLocalizedString("Support The Project", comment: ""))
-        case .githubProfile:
-            return linkCell(title: NSLocalizedString("GitHub - @minh-ton", comment: ""))
         }
     }
     
@@ -80,23 +71,6 @@ final class AboutSettingsSection {
             )
             return
         }
-        
-        if let url = url(for: row) {
-            LibrarySharedUtils.openLinkInBrowser(url.absoluteString, from: viewController)
-        }
-    }
-    
-    private func url(for row: Row) -> URL? {
-        switch row {
-        case .sourceCode:
-            return URL(string: "https://github.com/minh-ton/reynard-browser")
-        case .supportProject:
-            return URL(string: "https://buymeacoffee.com/hnimnot")
-        case .githubProfile:
-            return URL(string: "https://github.com/minh-ton")
-        case .experimentalFeatures, .appVersion, .engineVersion:
-            return nil
-        }
     }
     
     private func valueCell(title: String, value: String) -> UITableViewCell {
@@ -107,14 +81,6 @@ final class AboutSettingsSection {
         cell.selectionStyle = .none
         cell.accessoryType = .none
         cell.configureDetailTextCopying()
-        return cell
-    }
-    
-    private func linkCell(title: String) -> UITableViewCell {
-        let cell = SettingsTableViewCell(style: .value1, reuseIdentifier: nil)
-        cell.textLabel?.text = title
-        cell.textLabel?.textColor = .systemBlue
-        cell.accessoryType = .disclosureIndicator
         return cell
     }
 }

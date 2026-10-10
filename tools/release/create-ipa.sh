@@ -80,8 +80,10 @@ cp -R "$APP_PATH" "$WORK_DIR/Payload/"
 cd "$WORK_DIR"
 
 if [ "$BUILD_TYPE" != "normal" ]; then
+	APP_BUNDLE="Payload/$(basename "$APP_PATH")"
+	HELPER_BUNDLE="$APP_BUNDLE/PlugIns/$HELPER_APPEX_NAME"
 	PTRACE_JIT_SRC="$ROOT_DIR/browser/Reynard/JIT/Unsandboxed/ptrace_jit.c"
-	PTRACE_JIT_OUT="Payload/Reynard.app/$PTRACE_JIT_NAME"
+	PTRACE_JIT_OUT="$APP_BUNDLE/$PTRACE_JIT_NAME"
 
 	"$CLANG_PATH" \
 		-arch arm64 \
@@ -92,9 +94,37 @@ if [ "$BUILD_TYPE" != "normal" ]; then
 		-o "$PTRACE_JIT_OUT"
 
 	chmod 0755 "$PTRACE_JIT_OUT"
+
+	# Resolve the real executable paths from each bundle's Info.plist instead of
+	# assuming they match the bundle name. Renaming the product changes the bundle
+	# name and the executable name independently, so hardcoded paths such as
+	# "Payload/Reynard.app/Reynard" silently break once the app gets rebranded.
+	MAIN_BIN_NAME="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleExecutable' "$APP_BUNDLE/Info.plist" 2>/dev/null || true)"
+	HELPER_BIN_NAME="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleExecutable' "$HELPER_BUNDLE/Info.plist" 2>/dev/null || true)"
+	MAIN_BIN="$APP_BUNDLE/$MAIN_BIN_NAME"
+	HELPER_BIN="$HELPER_BUNDLE/$HELPER_BIN_NAME"
+
+	echo "Signing binaries:"
+	echo "  jit    -> $PTRACE_JIT_OUT"
+	echo "  main   -> $MAIN_BIN"
+	echo "  helper -> $HELPER_BIN"
+
+	for BIN in "$PTRACE_JIT_OUT" "$MAIN_BIN" "$HELPER_BIN"; do
+		if [ ! -f "$BIN" ]; then
+			echo "Failed to locate binary: $BIN" >&2
+			echo "--- $APP_BUNDLE ---" >&2
+			ls -la "$APP_BUNDLE" >&2 || true
+			echo "--- $APP_BUNDLE/PlugIns ---" >&2
+			ls -la "$APP_BUNDLE/PlugIns" >&2 || true
+			echo "--- $HELPER_BUNDLE ---" >&2
+			ls -la "$HELPER_BUNDLE" >&2 || true
+			exit 1
+		fi
+	done
+
 	ldid -S"$ROOT_DIR/browser/Reynard/JIT/Unsandboxed/ptrace_jit.entitlements" "$PTRACE_JIT_OUT"
-	ldid -S"$ROOT_DIR/browser/Reynard/Entitlements/Reynard.private.entitlements" "Payload/Reynard.app/Reynard"
-	ldid -S"$ROOT_DIR/browser/Helper/Entitlements/Reynard-Helper.private.entitlements" "Payload/Reynard.app/PlugIns/$HELPER_APPEX_NAME/$HELPER_APPEX_NAME"
+	ldid -S"$ROOT_DIR/browser/Reynard/Entitlements/Reynard.private.entitlements" "$MAIN_BIN"
+	ldid -S"$ROOT_DIR/browser/Helper/Entitlements/Reynard-Helper.private.entitlements" "$HELPER_BIN"
 fi
 
 if [ "$BUILD_TYPE" = "--jailbroken" ]; then

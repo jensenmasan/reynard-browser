@@ -55,6 +55,21 @@ final class HomepageRootViewController: UIViewController {
         return imageView
     }()
     
+    private let greetingLabel: UILabel = {
+        let label = UILabel()
+        label.translatesAutoresizingMaskIntoConstraints = false
+        label.text = "马老师祝您新年快乐"
+        label.font = .systemFont(ofSize: 20, weight: .semibold)
+        label.textColor = .label
+        label.textAlignment = .center
+        label.numberOfLines = 0
+        label.layer.shadowColor = UIColor.black.cgColor
+        label.layer.shadowOpacity = 0.25
+        label.layer.shadowRadius = 4
+        label.layer.shadowOffset = CGSize(width: 0, height: 1)
+        return label
+    }()
+    
     private let scrollView: UIScrollView = {
         let scrollView = UIScrollView()
         scrollView.translatesAutoresizingMaskIntoConstraints = false
@@ -194,6 +209,7 @@ final class HomepageRootViewController: UIViewController {
     private func configureHierarchy() {
         view.addSubview(wallpaperImageView)
         view.addSubview(scrollView)
+        scrollView.addSubview(greetingLabel)
         scrollView.addSubview(sectionStackView)
         updateWallpaper()
     }
@@ -214,7 +230,11 @@ final class HomepageRootViewController: UIViewController {
             scrollView.bottomAnchor.constraint(equalTo: view.bottomAnchor),
             scrollView.contentLayoutGuide.widthAnchor.constraint(equalTo: scrollView.frameLayoutGuide.widthAnchor),
             
-            sectionStackView.topAnchor.constraint(equalTo: scrollView.contentLayoutGuide.topAnchor),
+            greetingLabel.topAnchor.constraint(equalTo: scrollView.contentLayoutGuide.topAnchor),
+            greetingLabel.leadingAnchor.constraint(equalTo: scrollView.contentLayoutGuide.leadingAnchor, constant: UX.horizontalInset),
+            greetingLabel.trailingAnchor.constraint(equalTo: scrollView.contentLayoutGuide.trailingAnchor, constant: -UX.horizontalInset),
+            
+            sectionStackView.topAnchor.constraint(equalTo: greetingLabel.bottomAnchor, constant: 20),
             sectionStackView.centerXAnchor.constraint(equalTo: scrollView.frameLayoutGuide.centerXAnchor),
             sectionStackView.bottomAnchor.constraint(equalTo: scrollView.contentLayoutGuide.bottomAnchor),
             widthConstraint,
