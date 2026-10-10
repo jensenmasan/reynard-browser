@@ -151,6 +151,17 @@ jobs:
       - name: Set up sccache
         uses: mozilla-actions/sccache-action@v0.0.11
 
+      - name: Restore Gecko build output cache
+        id: gecko_build_cache
+        continue-on-error: true
+        uses: actions/cache@v4
+        with:
+          path: engine/firefox/obj-*
+          key: buildcache-gecko-obj-${{ matrix.variant }}-${{ hashFiles('engine/release.txt', 'patches/**/*.patch', 'tools/development/build-gecko.sh') }}
+
+      - name: Report Gecko build cache status
+        run: echo Gecko-build-cache-hit=${{ steps.gecko_build_cache.outputs.cache-hit }}
+
       - name: Build Gecko
         env:
           CC: clang
