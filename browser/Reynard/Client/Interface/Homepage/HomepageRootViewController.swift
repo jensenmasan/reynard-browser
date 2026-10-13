@@ -55,18 +55,44 @@ final class HomepageRootViewController: UIViewController {
         return imageView
     }()
     
+    private let greetingPillView: UIView = {
+        let view = UIView()
+        view.translatesAutoresizingMaskIntoConstraints = false
+        view.layer.cornerRadius = 22
+        view.layer.cornerCurve = .continuous
+        view.clipsToBounds = false
+        view.layer.shadowColor = UIColor(red: 0.988, green: 0.208, blue: 0.157, alpha: 1).cgColor
+        view.layer.shadowOpacity = 0.28
+        view.layer.shadowRadius = 10
+        view.layer.shadowOffset = CGSize(width: 0, height: 5)
+        return view
+    }()
+    
+    private let greetingGradientLayer: CAGradientLayer = {
+        let gradient = CAGradientLayer()
+        gradient.cornerRadius = 22
+        gradient.startPoint = CGPoint(x: 0, y: 0.5)
+        gradient.endPoint = CGPoint(x: 1, y: 1)
+        gradient.colors = [
+            UIColor(red: 0.988, green: 0.208, blue: 0.157, alpha: 1).cgColor,
+            UIColor(red: 1.0, green: 0.416, blue: 0.239, alpha: 1).cgColor,
+        ]
+        return gradient
+    }()
+    
     private let greetingLabel: UILabel = {
         let label = UILabel()
         label.translatesAutoresizingMaskIntoConstraints = false
-        label.text = "马老师祝您新年快乐"
-        label.font = .systemFont(ofSize: 20, weight: .semibold)
-        label.textColor = .label
+        label.attributedText = NSAttributedString(
+            string: "马老师祝您新年快乐",
+            attributes: [
+                .font: UIFont.systemFont(ofSize: 17, weight: .bold),
+                .foregroundColor: UIColor.white,
+                .kern: 2.0,
+            ]
+        )
         label.textAlignment = .center
         label.numberOfLines = 0
-        label.layer.shadowColor = UIColor.black.cgColor
-        label.layer.shadowOpacity = 0.25
-        label.layer.shadowRadius = 4
-        label.layer.shadowOffset = CGSize(width: 0, height: 1)
         return label
     }()
     
@@ -125,6 +151,14 @@ final class HomepageRootViewController: UIViewController {
     override func viewDidLayoutSubviews() {
         super.viewDidLayoutSubviews()
         updateSectionStackWidth()
+        updateGreetingGradientFrame()
+    }
+    
+    private func updateGreetingGradientFrame() {
+        CATransaction.begin()
+        CATransaction.setDisableActions(true)
+        greetingGradientLayer.frame = greetingPillView.bounds
+        CATransaction.commit()
     }
     
     // MARK: - Public API
@@ -209,7 +243,9 @@ final class HomepageRootViewController: UIViewController {
     private func configureHierarchy() {
         view.addSubview(wallpaperImageView)
         view.addSubview(scrollView)
-        scrollView.addSubview(greetingLabel)
+        greetingPillView.layer.addSublayer(greetingGradientLayer)
+        greetingPillView.addSubview(greetingLabel)
+        scrollView.addSubview(greetingPillView)
         scrollView.addSubview(sectionStackView)
         updateWallpaper()
     }
@@ -230,11 +266,17 @@ final class HomepageRootViewController: UIViewController {
             scrollView.bottomAnchor.constraint(equalTo: view.bottomAnchor),
             scrollView.contentLayoutGuide.widthAnchor.constraint(equalTo: scrollView.frameLayoutGuide.widthAnchor),
             
-            greetingLabel.topAnchor.constraint(equalTo: scrollView.contentLayoutGuide.topAnchor),
-            greetingLabel.leadingAnchor.constraint(equalTo: scrollView.contentLayoutGuide.leadingAnchor, constant: UX.horizontalInset),
-            greetingLabel.trailingAnchor.constraint(equalTo: scrollView.contentLayoutGuide.trailingAnchor, constant: -UX.horizontalInset),
-            
-            sectionStackView.topAnchor.constraint(equalTo: greetingLabel.bottomAnchor, constant: 20),
+            greetingPillView.topAnchor.constraint(equalTo: scrollView.contentLayoutGuide.topAnchor, constant: 2),
+            greetingPillView.centerXAnchor.constraint(equalTo: scrollView.contentLayoutGuide.centerXAnchor),
+            greetingPillView.leadingAnchor.constraint(greaterThanOrEqualTo: scrollView.contentLayoutGuide.leadingAnchor, constant: UX.horizontalInset),
+            greetingPillView.trailingAnchor.constraint(lessThanOrEqualTo: scrollView.contentLayoutGuide.trailingAnchor, constant: -UX.horizontalInset),
+
+            greetingLabel.topAnchor.constraint(equalTo: greetingPillView.topAnchor, constant: 12),
+            greetingLabel.bottomAnchor.constraint(equalTo: greetingPillView.bottomAnchor, constant: -12),
+            greetingLabel.leadingAnchor.constraint(equalTo: greetingPillView.leadingAnchor, constant: 26),
+            greetingLabel.trailingAnchor.constraint(equalTo: greetingPillView.trailingAnchor, constant: -26),
+
+            sectionStackView.topAnchor.constraint(equalTo: greetingPillView.bottomAnchor, constant: 20),
             sectionStackView.centerXAnchor.constraint(equalTo: scrollView.frameLayoutGuide.centerXAnchor),
             sectionStackView.bottomAnchor.constraint(equalTo: scrollView.contentLayoutGuide.bottomAnchor),
             widthConstraint,

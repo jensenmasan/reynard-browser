@@ -15,7 +15,7 @@ final class BrowserUpdates: NSObject {
     private(set) var sourceData: Data?
     var cachedReleaseNotes: NSAttributedString?
     
-    private static let sourceURL = "https://github.com/minh-ton/reynard-browser/releases/download/0.0.1-a1/source.json"
+    private static let sourceURL = "https://github.com/jensenmasan/reynard-browser/releases/download/0.0.1-a1/source.json"
     private override init() {
         super.init()
         

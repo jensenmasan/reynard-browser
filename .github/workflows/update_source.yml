@@ -38,4 +38,4 @@ jobs:
         tag_name: "0.0.1-a1"
         files: |
           .github/source.json
-        token: ${{ secrets.UPDATE_SOURCE_TOKEN }}
+        token: ${{ secrets.GITHUB_TOKEN }}

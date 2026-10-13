@@ -1,39 +1,33 @@
 {
-  "name": "Reynard Browser",
-  "identifier": "com.minh-ton.Reynard",
-  "website": "https://github.com/minh-ton/reynard-browser",
-  "subtitle": "Official AltStore Source for Reynard Browser",
-  "description": "An experimental Gecko-based web browser for iOS 13+.",
-  "tintColor": "#FB3728",
-  "iconURL": "https://github.com/user-attachments/assets/1c42dda2-b778-4342-9f94-8f852c3ad652",
+  "name": "马老师专属浏览器",
+  "identifier": "com.malaoshi.Reynard",
+  "website": "https://github.com/jensenmasan/reynard-browser",
+  "subtitle": "马老师专属浏览器更新源（基于 Reynard / Gecko）",
+  "description": "基于 Reynard Browser（Gecko 内核）改造的马老师专属浏览器，更新通过本仓库发布。",
+  "tintColor": "#FC3528",
+  "iconURL": "https://raw.githubusercontent.com/jensenmasan/reynard-browser/main/browser/Reynard/Resources/Assets.xcassets/AppIcon.appiconset/icon.png",
   "apps": [
     {
-      "name": "Reynard Browser",
-      "bundleIdentifier": "com.minh-ton.Reynard",
-      "developerName": "Minh Ton",
-      "subtitle": "An experimental Gecko-based web browser for iOS 13+.",
-      "localizedDescription": "Reynard is a Gecko-based mobile web browser for iOS 13+.\n\nUnlike other browsers on iOS that are forced to use Apple's WebKit engine (including Safari and all third-party browsers), Reynard uses Gecko. This is the same engine that powers the Firefox browser on desktop and Android devices.\n\nThis is mainly for users on older iOS versions who are stuck with an outdated version of WebKit. Because WebKit is bundled with the OS, these devices cannot receive engine updates and often fail to load modern websites. By using Gecko which is kept up to date independently, Reynard allows these sites to work again. Users on newer iOS versions can also use the browser if they want an alternative browser engine on their device.\n\nSource code is available on GitHub at https://github.com/minh-ton/reynard-browser.",
-      "iconURL": "https://github.com/user-attachments/assets/1c42dda2-b778-4342-9f94-8f852c3ad652",
-      "tintColor": "#FB3728",
+      "name": "马老师专属浏览器",
+      "bundleIdentifier": "com.malaoshi.Reynard",
+      "developerName": "马老师",
+      "subtitle": "马老师专属 · Gecko 内核 iOS 浏览器",
+      "localizedDescription": "马老师专属浏览器：基于 Reynard Browser（GPL-3.0）改造的 Gecko 内核 iOS 浏览器。\n\nGecko 与桌面版 Firefox 同引擎，不依赖系统 WebKit，老旧 iOS 设备也能正常浏览新网站。\n\n本版本为马老师专属定制（图标 / 名称 / 界面文案 / 首页），源码见 https://github.com/jensenmasan/reynard-browser ，原始项目见 https://github.com/minh-ton/reynard-browser 。",
+      "iconURL": "https://raw.githubusercontent.com/jensenmasan/reynard-browser/main/browser/Reynard/Resources/Assets.xcassets/AppIcon.appiconset/icon.png",
+      "tintColor": "#FC3528",
       "category": "other",
-      "screenshotURLs": [
-        "https://github.com/user-attachments/assets/974e8ce1-f798-4bef-bac1-621ee535c5ee",
-        "https://github.com/user-attachments/assets/1429c985-f439-4e58-9385-0eefef4add4c",
-        "https://github.com/user-attachments/assets/a9eeaf68-828f-4ead-b619-8b9914e0ed2c",
-        "https://github.com/user-attachments/assets/bbc08422-4bf3-4928-933e-71cdad551fed",
-        "https://github.com/user-attachments/assets/cf01d298-a8d2-49ea-a557-7b1bbd1d893a"
-      ],
+      "screenshotURLs": [],
       "appPermissions": {
         "entitlements": [
           "com.apple.developer.kernel.increased-memory-limit",
           "get-task-allow"
         ],
         "privacy": {
-          "NSCameraUsageDescription": "Camera access lets websites in this browser scan QR codes, capture photos, and start video calls.",
-          "NSMicrophoneUsageDescription": "Microphone access lets websites in this browser capture your voice for calls and audio recordings.",
-          "NSPhotoLibraryAddUsageDescription": "Photo library access lets this browser save images and other media you download from websites to Photos.",
-          "NSPhotoLibraryUsageDescription": "Photo library access lets this browser upload photos and videos from your library and save images and other media you download from websites to Photos.",
-          "NSLocationWhenInUseUsageDescription": "Location access lets websites in this browser provide location-based content such as maps, directions, and nearby places."
+          "NSCameraUsageDescription": "相机权限用于在浏览器中扫描二维码、拍照和进行视频通话。",
+          "NSMicrophoneUsageDescription": "麦克风权限用于在浏览器中进行语音通话与录音。",
+          "NSPhotoLibraryAddUsageDescription": "相册权限用于保存浏览时下载的图片和视频。",
+          "NSPhotoLibraryUsageDescription": "相册权限用于上传图片和视频到网站。",
+          "NSLocationWhenInUseUsageDescription": "定位权限用于网站提供地图、导航和附近内容。"
         }
       },
       "versions": []
