@@ -154,7 +154,7 @@ jobs:
       - name: Restore Gecko build output cache
         id: gecko_build_cache
         continue-on-error: true
-        uses: actions/cache@v4
+        uses: actions/cache/restore@v4
         with:
           path: engine/firefox/obj-*
           key: buildcache-gecko-obj-${{ matrix.variant }}-${{ hashFiles('engine/release.txt', 'patches/**/*.patch', 'tools/development/build-gecko.sh') }}
@@ -213,3 +213,12 @@ jobs:
           name: Reynard-Jailbroken.ipa
           path: dist/Reynard-Jailbroken.ipa
           if-no-files-found: error
+
+      # 引擎全量构建要 ~55-80 分钟；即使后面打包步骤失败也要把产物缓存下来，
+      # 否则每次都要从头全量编译（actions/cache 默认只在 job 成功时保存）。
+      - name: Save Gecko build output cache
+        if: ${{ always() && steps.gecko_build_cache.outputs.cache-hit != 'true' }}
+        uses: actions/cache/save@v4
+        with:
+          path: engine/firefox/obj-*
+          key: buildcache-gecko-obj-${{ matrix.variant }}-${{ hashFiles('engine/release.txt', 'patches/**/*.patch', 'tools/development/build-gecko.sh') }}

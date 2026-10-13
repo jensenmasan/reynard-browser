@@ -81,7 +81,7 @@ cd "$WORK_DIR"
 
 if [ "$BUILD_TYPE" != "normal" ]; then
 	APP_BUNDLE="Payload/$(basename "$APP_PATH")"
-	HELPER_BUNDLE="$APP_BUNDLE/PlugIns/$HELPER_APPEX_NAME"
+	HELPER_BUNDLE="$APP_BUNDLE/PlugIns/$HELPER_APPEX_NAME.appex"
 	PTRACE_JIT_SRC="$ROOT_DIR/browser/Reynard/JIT/Unsandboxed/ptrace_jit.c"
 	PTRACE_JIT_OUT="$APP_BUNDLE/$PTRACE_JIT_NAME"
 
