@@ -235,7 +235,12 @@ final class HomepageRootViewController: UIViewController {
         )
         scrollView.contentInset = contentInset
         scrollView.scrollIndicatorInsets = contentInset
-        if isAtTop {
+        // 仅在用户没有正在触摸/拖动/减速时才校正偏移，
+        // 避免布局更新把滚动位置强行拽回顶部，表现为“无法向下滑动”
+        if isAtTop,
+           !scrollView.isTracking,
+           !scrollView.isDragging,
+           !scrollView.isDecelerating {
             scrollView.contentOffset.y = -contentInset.top
         }
     }

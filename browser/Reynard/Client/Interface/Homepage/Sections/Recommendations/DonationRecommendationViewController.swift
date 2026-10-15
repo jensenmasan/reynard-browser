@@ -356,25 +356,8 @@ final class DonationRecommendationViewController: UIViewController, HomepageReco
     // MARK: - Helpers
     
     private var isRecommendationShown: Bool {
-        if isPrivateBrowsing || contentMode.isDetached {
-            return false
-        }
-        
-        if PerformanceRecommendationViewController.isRecommendationShown(
-            isPrivateBrowsing: isPrivateBrowsing,
-            contentMode: contentMode
-        ) {
-            return false
-        }
-        
-        if UpdateAvailableViewController.isRecommendationShown(
-            isPrivateBrowsing: isPrivateBrowsing,
-            contentMode: contentMode
-        ) {
-            return false
-        }
-        
-        return Date() >= Prefs.HomepageSettings.donationRecommendationShowTime
+        // 马老师定制：永久隐藏原开发者的赞助卡片（Support The Project / Buy Me a Coffee）
+        return false
     }
     
     private func nextDonationRecommendationShowTime(months: Int) -> Date {
