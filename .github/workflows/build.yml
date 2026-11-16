@@ -126,16 +126,42 @@ jobs:
         with:
           targets: aarch64-apple-ios
 
-      - name: Prefer rustup-managed toolchain over Homebrew shims
+      - name: Pin Rust toolchain for mach
         run: |
-          # Recent macOS runner images ship a Homebrew "rustup" whose bin dir wins
-          # over ~/.cargo/bin. Its rustup entry is actually a rustc symlink, so
-          # mach's `rustup which rustc` becomes `rustc which rustc` and configure
-          # dies with "multiple input filenames provided".
-          filtered=$(printf '%s' "$PATH" | tr ':' '\n' | grep -v '^/opt/homebrew/opt/rustup/bin$' | paste -sd ':' -)
-          echo "PATH=$HOME/.cargo/bin:$filtered" >> "$GITHUB_ENV"
-          echo "which rustc: $(command -v rustc)"
-          rustup which rustc
+          # Runner images disagree about Rust: some ship a Homebrew "rustup" whose
+          # bin/rustup is actually a rustc symlink (mach then runs
+          # `rustc which rustc` and dies on "multiple input filenames"), and
+          # ~/.cargo/bin is not always populated with usable proxies. Resolve one
+          # rustup that really works, then expose its toolchain first in PATH.
+          candidates="$HOME/.cargo/bin/rustup $(command -v rustup 2>/dev/null || true) /opt/homebrew/bin/rustup /opt/homebrew/opt/rustup/bin/rustup"
+          chosen=""
+          for candidate in $candidates; do
+            [ -x "$candidate" ] || continue
+            if "$candidate" which rustc > /tmp/rustc-path 2>/dev/null; then
+              chosen="$candidate"
+              break
+            fi
+          done
+
+          if [ -z "$chosen" ]; then
+            echo "::error::No working rustup found; cannot locate the Rust toolchain."
+            exit 1
+          fi
+
+          rustc_path="$(cat /tmp/rustc-path)"
+          cargo_path="$("$chosen" which cargo)"
+          echo "rustup: $chosen"
+          echo "rustc:  $rustc_path"
+          echo "cargo:  $cargo_path"
+
+          pinned="$RUNNER_TEMP/rust-bin"
+          mkdir -p "$pinned"
+          ln -sf "$rustc_path" "$pinned/rustc"
+          ln -sf "$cargo_path" "$pinned/cargo"
+          ln -sf "$chosen" "$pinned/rustup"
+          echo "$pinned" >> "$GITHUB_PATH"
+
+          "$pinned/rustc" --version
 
       - name: Hash Rust toolchain for cache
         id: rust_toolchain
