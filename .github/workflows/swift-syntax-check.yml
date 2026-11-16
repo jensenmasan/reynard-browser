@@ -1,0 +1,41 @@
+name: Swift Syntax Check
+
+on:
+  workflow_dispatch:
+  push:
+
+permissions:
+  contents: read
+
+jobs:
+  parse:
+    name: Parse Swift sources
+    runs-on: ubuntu-latest
+    container: swift:5.10
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Parse Swift files
+        run: |
+          set -e
+          fail=0
+          count=0
+          while IFS= read -r file; do
+            count=$((count + 1))
+            if ! swiftc -parse "$file" 2>/tmp/err.txt; then
+              echo "::error file=$file::syntax error"
+              cat /tmp/err.txt
+              fail=1
+            fi
+          done < <(find browser extensions -name '*.swift')
+          echo "Parsed $count Swift files."
+          exit $fail
+
+      - name: Check JavaScript sources
+        run: |
+          set -e
+          for file in $(find extensions -name '*.js'); do
+            node --check "$file"
+            echo "OK $file"
+          done
