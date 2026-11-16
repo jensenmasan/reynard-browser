@@ -356,10 +356,7 @@ final class BookmarksViewController: UIViewController, UITableViewDataSource, UI
                 return
             }
             
-            let viewController = EditBookmarkViewController(bookmark: bookmark, store: self.store)
-            let navigationController = UINavigationController(rootViewController: viewController)
-            navigationController.modalPresentationStyle = .pageSheet
-            self.present(navigationController, animated: true)
+            self.presentBookmarkEditor(for: bookmark)
             completion(true)
         }
         editAction.backgroundColor = .systemBlue
@@ -385,6 +382,69 @@ final class BookmarksViewController: UIViewController, UITableViewDataSource, UI
         
         reloadBookmarkRows()
         return didDelete
+    }
+    
+    func tableView(
+        _ tableView: UITableView,
+        contextMenuConfigurationForRowAt indexPath: IndexPath,
+        point: CGPoint
+    ) -> UIContextMenuConfiguration? {
+        guard !isEditing,
+              let item = item(at: indexPath) else {
+            return nil
+        }
+        
+        switch item {
+        case let .bookmark(bookmark):
+            return BookmarkRowActions.configuration(
+                for: bookmark,
+                openInNewTab: { [weak self] in
+                    self?.openBookmarkURL(bookmark, disposition: .newTab)
+                },
+                openInNewPrivateTab: { [weak self] in
+                    self?.openBookmarkURL(bookmark, disposition: .newPrivateTab)
+                },
+                shareLink: { [weak self, weak tableView] url in
+                    guard let self,
+                          let browserViewController = LibrarySharedUtils.resolvedBrowserViewController(from: self) else {
+                        return
+                    }
+                    
+                    browserViewController.presentShareSheet(
+                        items: [url],
+                        sourceView: tableView ?? self.view,
+                        sourceRect: CGRect(
+                            x: self.view.bounds.midX,
+                            y: self.view.bounds.midY,
+                            width: 1,
+                            height: 1
+                        )
+                    )
+                },
+                editBookmark: { [weak self] in
+                    self?.presentBookmarkEditor(for: bookmark)
+                },
+                deleteBookmark: { [weak self] in
+                    _ = self?.deleteItem(at: indexPath)
+                }
+            )
+            
+        case let .folder(folder):
+            return BookmarkRowActions.configuration(
+                for: folder,
+                openFolder: { [weak self] in
+                    guard let self else {
+                        return
+                    }
+                    
+                    let viewController = BookmarksViewController(folderID: folder.guid, store: self.store)
+                    self.navigationController?.pushViewController(viewController, animated: true)
+                },
+                deleteFolder: { [weak self] in
+                    _ = self?.deleteItem(at: indexPath)
+                }
+            )
+        }
     }
     
     func tableView(_ tableView: UITableView, didSelectRowAt indexPath: IndexPath) {
@@ -765,14 +825,29 @@ final class BookmarksViewController: UIViewController, UITableViewDataSource, UI
     
     // MARK: - Navigation
     
-    private func openBookmarkURL(_ bookmark: BookmarkSnapshot) {
+    private func presentBookmarkEditor(for bookmark: BookmarkSnapshot) {
+        let viewController = EditBookmarkViewController(bookmark: bookmark, store: store)
+        let navigationController = UINavigationController(rootViewController: viewController)
+        navigationController.modalPresentationStyle = .pageSheet
+        present(navigationController, animated: true)
+    }
+    
+    private func openBookmarkURL(
+        _ bookmark: BookmarkSnapshot,
+        disposition: TabOpenDisposition = .currentTab
+    ) {
         guard let browserViewController = LibrarySharedUtils.resolvedBrowserViewController(from: self) else {
             return
         }
         
         browserViewController.loadViewIfNeeded()
         browserViewController.exitFullscreenIfNeeded()
-        browserViewController.tabManager.browse(to: bookmark.url.absoluteString)
+        
+        if disposition == .currentTab {
+            browserViewController.tabManager.browse(to: bookmark.url.absoluteString)
+        } else {
+            browserViewController.openURLFromHomepage(bookmark.url, disposition: disposition)
+        }
         
         if navigationController?.presentingViewController is BrowserViewController {
             navigationController?.dismiss(animated: true)

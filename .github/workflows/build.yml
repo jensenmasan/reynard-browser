@@ -118,6 +118,9 @@ jobs:
       - name: Apply Gecko patches
         run: ./tools/development/apply-patches.sh
 
+      - name: Install bundled built-in add-ons
+        run: ./tools/development/install-builtin-extensions.sh
+
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
         with:
@@ -157,7 +160,7 @@ jobs:
         uses: actions/cache/restore@v4
         with:
           path: engine/firefox/obj-*
-          key: buildcache-gecko-obj-${{ matrix.variant }}-${{ hashFiles('engine/release.txt', 'patches/**/*.patch', 'tools/development/build-gecko.sh') }}
+          key: buildcache-gecko-obj-${{ matrix.variant }}-${{ hashFiles('engine/release.txt', 'patches/**/*.patch', 'tools/development/build-gecko.sh', 'extensions/**', 'tools/development/install-builtin-extensions.sh') }}
 
       - name: Report Gecko build cache status
         run: echo Gecko-build-cache-hit=${{ steps.gecko_build_cache.outputs.cache-hit }}
@@ -221,4 +224,4 @@ jobs:
         uses: actions/cache/save@v4
         with:
           path: engine/firefox/obj-*
-          key: buildcache-gecko-obj-${{ matrix.variant }}-${{ hashFiles('engine/release.txt', 'patches/**/*.patch', 'tools/development/build-gecko.sh') }}
+          key: buildcache-gecko-obj-${{ matrix.variant }}-${{ hashFiles('engine/release.txt', 'patches/**/*.patch', 'tools/development/build-gecko.sh', 'extensions/**', 'tools/development/install-builtin-extensions.sh') }}

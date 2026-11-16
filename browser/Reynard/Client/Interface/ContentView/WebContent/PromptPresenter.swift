@@ -51,6 +51,9 @@ final class PromptPresenter: PromptPresenting {
             
         case .share(let request):
             return await presentShare(session: session, request: request)
+            
+        case .beforeUnload(let request):
+            return await presentBeforeUnload(request: request)
         }
     }
     
@@ -243,8 +246,36 @@ final class PromptPresenter: PromptPresenting {
         }
     }
     
-    // MARK: - Picker Prompts
+    private func presentBeforeUnload(request: BeforeUnloadPromptRequest) async -> PromptResponse? {
+        guard let presenter = UIApplication.shared.topViewController() else {
+            // Without a presenter we must not silently throw away the page.
+            return .beforeUnload(allowed: false)
+        }
+        
+        let title = request.title.trimmingCharacters(in: .whitespacesAndNewlines)
+        let message = request.message.trimmingCharacters(in: .whitespacesAndNewlines)
+        
+        return await withCheckedContinuation { continuation in
+            var response: PromptResponse = .beforeUnload(allowed: false)
+            let alert = PromptAlertController(
+                title: title.isEmpty ? NSLocalizedString("Leave This Page?", comment: "") : title,
+                message: message.isEmpty
+                ? NSLocalizedString("Your changes may not be saved if you leave now.", comment: "")
+                : message,
+                preferredStyle: .alert
+            )
+            alert.onDismissed = {
+                continuation.resume(returning: response)
+            }
+            alert.addAction(UIAlertAction(title: NSLocalizedString("Stay on Page", comment: ""), style: .cancel))
+            alert.addAction(UIAlertAction(title: NSLocalizedString("Leave", comment: ""), style: .destructive) { _ in
+                response = .beforeUnload(allowed: true)
+            })
+            presenter.present(alert, animated: true)
+        }
+    }
     
+    // MARK: - Picker Prompts
     private func presentColorPicker(
         session: GeckoSession,
         request: ColorPromptRequest

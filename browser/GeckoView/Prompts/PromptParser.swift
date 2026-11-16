@@ -98,6 +98,13 @@ func parsePromptRequest(_ data: [String: Any]) -> PromptRequest? {
             url: data["uri"] as? String
         ))
         
+    case "beforeUnload":
+        return .beforeUnload(BeforeUnloadPromptRequest(
+            id: promptID,
+            title: data["title"] as? String ?? "",
+            message: data["msg"] as? String ?? ""
+        ))
+        
     default:
         return nil
     }

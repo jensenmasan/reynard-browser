@@ -21,6 +21,9 @@ protocol AddressBarDelegate: AnyObject {
     func addressBarDidRequestHideToolbar(_ addressBar: AddressBar)
     func addressBarDidRequestWebsiteSettings(_ addressBar: AddressBar)
     func addressBar(_ addressBar: AddressBar, didRequestBookmarkInFavorites favorites: Bool)
+    func addressBarDidRequestFloatingWindow(_ addressBar: AddressBar)
+    func addressBarDidRequestTranslatePage(_ addressBar: AddressBar)
+    func addressBarIsFloatingWindowActive(_ addressBar: AddressBar) -> Bool
     func addressBarShareableURL(_ addressBar: AddressBar) -> URL?
     func addressBarTabCount(_ addressBar: AddressBar) -> Int
     func addressBarDidRequestCloseThisTab(_ addressBar: AddressBar)
@@ -399,6 +402,7 @@ final class AddressBar: UIView {
             usesDesktopWebsite: usesDesktopWebsite,
             addonItems: delegate?.addressBarAddonItems(self) ?? [],
             isReaderable: readerMode.isReaderable,
+            isFloatingWindowActive: delegate?.addressBarIsFloatingWindowActive(self) ?? false,
             onShowReader: { [weak self] in
                 guard let self else { return }
                 self.performAfterMenuDismissal { [weak self] in
@@ -417,6 +421,20 @@ final class AddressBar: UIView {
             onPageZoom: { [weak self] in
                 guard let self else { return }
                 self.delegate?.addressBarDidRequestPageZoom(self)
+            },
+            onFloatingWindow: { [weak self] in
+                guard let self else { return }
+                self.performAfterMenuDismissal { [weak self] in
+                    guard let self else { return }
+                    self.delegate?.addressBarDidRequestFloatingWindow(self)
+                }
+            },
+            onTranslatePage: { [weak self] in
+                guard let self else { return }
+                self.performAfterMenuDismissal { [weak self] in
+                    guard let self else { return }
+                    self.delegate?.addressBarDidRequestTranslatePage(self)
+                }
             },
             onChangeWebsiteMode: { [weak self] in
                 guard let self else { return }

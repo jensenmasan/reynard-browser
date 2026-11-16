@@ -29,6 +29,10 @@ public struct PromptResponse {
         return PromptResponse(geckoMessage: ["allow": allowed])
     }
     
+    public static func beforeUnload(allowed: Bool) -> PromptResponse {
+        return PromptResponse(geckoMessage: ["allow": allowed])
+    }
+    
     public static func color(_ value: String) -> PromptResponse {
         return PromptResponse(geckoMessage: ["color": value])
     }

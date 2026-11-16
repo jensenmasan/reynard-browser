@@ -56,10 +56,13 @@ enum AddressBarMenu {
         usesDesktopWebsite: Bool?,
         addonItems: [AddonItem],
         isReaderable: Bool,
+        isFloatingWindowActive: Bool,
         onShowReader: @escaping () -> Void,
         onAddonSelected: @escaping (AddonMenuItem) -> Void,
         onFindInPage: @escaping () -> Void,
         onPageZoom: @escaping () -> Void,
+        onFloatingWindow: @escaping () -> Void,
+        onTranslatePage: @escaping () -> Void,
         onChangeWebsiteMode: @escaping () -> Void,
         onHideToolbar: @escaping () -> Void,
         onWebsiteSettings: @escaping () -> Void,
@@ -118,6 +121,21 @@ enum AddressBarMenu {
             }
             pageActions.append(UIAction(title: NSLocalizedString("Find in Page", comment: ""), image: UIImage(named: "reynard.text.page.badge.magnifyingglass")) { _ in
                 onFindInPage()
+            })
+            let floatingWindowTitle = isFloatingWindowActive
+            ? NSLocalizedString("End Floating Window", comment: "")
+            : NSLocalizedString("Floating Window", comment: "")
+            pageActions.append(UIAction(
+                title: floatingWindowTitle,
+                image: UIImage(named: "reynard.plus.square.on.square")
+            ) { _ in
+                onFloatingWindow()
+            })
+            pageActions.append(UIAction(
+                title: NSLocalizedString("Immersive Translate", comment: ""),
+                image: UIImage(named: "reynard.text.page")
+            ) { _ in
+                onTranslatePage()
             })
         }
         

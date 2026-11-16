@@ -60,5 +60,34 @@ enum RuntimePreferences {
         
         // Remote Debugging
         RemoteDebuggingSettingController.applyRemoteDebugging()
+        
+        // Web MIDI
+        applyWebMIDI()
+        
+        // Leave confirmation (beforeunload)
+        applyLeaveConfirmation()
+    }
+    
+    /// Allows sites to reach connected MIDI devices through `navigator.requestMIDIAccess()`.
+    ///
+    /// GeckoView has no permission delegate hook for the `midi` permission, so the
+    /// permission is granted through the permission manager default instead of a
+    /// native prompt. Turning the switch off denies the permission outright.
+    static func applyWebMIDI() {
+        GeckoRuntime.setDefaultPrefs([
+            "dom.webmidi.enabled": Prefs.ExperimentalSettings.webMIDIEnabled,
+            "dom.webmidi.gated": false,
+            "permissions.default.midi": Prefs.ExperimentalSettings.webMIDIEnabled ? 1 : 2,
+        ])
+    }
+    
+    /// Enables the “this page is asking you to confirm that you want to leave” prompt.
+    ///
+    /// Gecko disables `beforeunload` dialogs by default, so the pref has to be
+    /// flipped for the prompt to reach `PromptDelegate`.
+    static func applyLeaveConfirmation() {
+        GeckoRuntime.setDefaultPrefs([
+            "dom.disable_beforeunload": !Prefs.ExperimentalSettings.confirmBeforeLeaving
+        ])
     }
 }

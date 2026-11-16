@@ -456,14 +456,22 @@ final class HistoryViewController: UIViewController, UITableViewDataSource, UITa
     
     // MARK: - Navigation
     
-    private func openHistoryItem(_ item: HistorySiteSnapshot) {
+    private func openHistoryItem(
+        _ item: HistorySiteSnapshot,
+        disposition: TabOpenDisposition = .currentTab
+    ) {
         guard let browserViewController = LibrarySharedUtils.resolvedBrowserViewController(from: self) else {
             return
         }
         
         browserViewController.loadViewIfNeeded()
         browserViewController.exitFullscreenIfNeeded()
-        browserViewController.tabManager.browse(to: item.url.absoluteString)
+        
+        if disposition == .currentTab {
+            browserViewController.tabManager.browse(to: item.url.absoluteString)
+        } else {
+            browserViewController.openURLFromHomepage(item.url, disposition: disposition)
+        }
         
         if navigationController?.presentingViewController is BrowserViewController {
             navigationController?.dismiss(animated: true)
@@ -562,6 +570,52 @@ final class HistoryViewController: UIViewController, UITableViewDataSource, UITa
         let configuration = UISwipeActionsConfiguration(actions: [deleteAction])
         configuration.performsFirstActionWithFullSwipe = true
         return configuration
+    }
+    
+    func tableView(
+        _ tableView: UITableView,
+        contextMenuConfigurationForRowAt indexPath: IndexPath,
+        point: CGPoint
+    ) -> UIContextMenuConfiguration? {
+        guard let item = item(at: indexPath) else {
+            return nil
+        }
+        
+        return HistoryRowActions.configuration(
+            for: item,
+            openInNewTab: { [weak self] in
+                self?.openHistoryItem(item, disposition: .newTab)
+            },
+            openInNewPrivateTab: { [weak self] in
+                self?.openHistoryItem(item, disposition: .newPrivateTab)
+            },
+            shareLink: { [weak self, weak tableView] url in
+                guard let self,
+                      let browserViewController = LibrarySharedUtils.resolvedBrowserViewController(from: self) else {
+                    return
+                }
+                
+                browserViewController.presentShareSheet(
+                    items: [url],
+                    sourceView: tableView ?? self.view,
+                    sourceRect: CGRect(
+                        x: self.view.bounds.midX,
+                        y: self.view.bounds.midY,
+                        width: 1,
+                        height: 1
+                    )
+                )
+            },
+            deleteEntry: { [weak self] in
+                guard let self else {
+                    return
+                }
+                
+                self.skipsNextStoreReload = true
+                HistoryStore.shared.removeSite(id: item.id)
+                self.deleteVisibleRow(at: indexPath)
+            }
+        )
     }
     
     func tableView(_ tableView: UITableView, didSelectRowAt indexPath: IndexPath) {

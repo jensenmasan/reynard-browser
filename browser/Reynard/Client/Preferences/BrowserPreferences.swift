@@ -51,6 +51,8 @@ final class BrowserPreferences {
             key("JITSettings", "isJITEnabled"): false,
             
             // Experimental
+            key("ExperimentalSettings", "webMIDIEnabled"): true,
+            key("ExperimentalSettings", "confirmBeforeLeaving"): true,
             
             // Compatibility
             key("CompatibilitySettings", "androidUserAgentDomains"): [],
@@ -1123,6 +1125,28 @@ final class BrowserPreferences {
     }
     
     // MARK: - Add-ons
+    struct ExperimentalSettings {
+        /// Lets websites use connected MIDI devices through the Web MIDI API.
+        static var webMIDIEnabled: Bool {
+            get {
+                return prefs.bool(forSetting: "ExperimentalSettings", key: "webMIDIEnabled")
+            }
+            set {
+                prefs.set(newValue, forSetting: "ExperimentalSettings", key: "webMIDIEnabled")
+            }
+        }
+        
+        /// Asks for confirmation before leaving a page that has unsaved changes.
+        static var confirmBeforeLeaving: Bool {
+            get {
+                return prefs.bool(forSetting: "ExperimentalSettings", key: "confirmBeforeLeaving")
+            }
+            set {
+                prefs.set(newValue, forSetting: "ExperimentalSettings", key: "confirmBeforeLeaving")
+            }
+        }
+    }
+    
     struct AddonSettings {
         static var lastGlobalCheckAt: Date? {
             get {

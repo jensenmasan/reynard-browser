@@ -1,0 +1,38 @@
+{
+  "manifest_version": 2,
+  "browser_specific_settings": {
+    "gecko": {
+      "id": "malaoshi-translate@malaoshi",
+      "strict_min_version": "115.0"
+    }
+  },
+  "name": "马老师沉浸式翻译",
+  "version": "1.0.0",
+  "description": "双语对照沉浸式翻译，内置免费接口，也可接入自有的 OpenAI 兼容接口。",
+  "icons": {
+    "48": "icon.svg",
+    "96": "icon.svg"
+  },
+  "permissions": [
+    "storage",
+    "tabs",
+    "menus",
+    "<all_urls>"
+  ],
+  "background": {
+    "scripts": ["background.js"],
+    "persistent": false
+  },
+  "browser_action": {
+    "default_title": "沉浸式翻译",
+    "default_icon": "icon.svg"
+  },
+  "content_scripts": [
+    {
+      "matches": ["http://*/*", "https://*/*"],
+      "js": ["content.js"],
+      "run_at": "document_idle",
+      "all_frames": false
+    }
+  ]
+}

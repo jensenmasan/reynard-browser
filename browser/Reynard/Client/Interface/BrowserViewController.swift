@@ -47,6 +47,7 @@ final class BrowserViewController: UIViewController, GeckoScreenOrientationDeleg
     
     let tabOverview = TabOverview()
     let contentView = ContentView()
+    let floatingWindowCoordinator = FloatingWindowCoordinator()
     lazy var browserChrome = BrowserChrome()
     var tabBar: TabBar { return browserChrome.tabBar }
     
@@ -160,6 +161,8 @@ final class BrowserViewController: UIViewController, GeckoScreenOrientationDeleg
         
         RuntimePreferences.apply() // Gecko prefs
         
+        floatingWindowCoordinator.attach(to: self)
+        TranslateController.shared.start()
         configureBrowserInterface()
         observeNotifications()
         contextMenuCoordinator.configure()
@@ -229,6 +232,7 @@ final class BrowserViewController: UIViewController, GeckoScreenOrientationDeleg
         )
         homepageOverlayCoordinator.updateVisibleContentInsets()
         invalidateNavigationThumbnailsIfNeeded()
+        floatingWindowCoordinator.updateLayoutIfNeeded()
     }
     
     override func traitCollectionDidChange(_ previousTraitCollection: UITraitCollection?) {

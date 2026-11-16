@@ -182,6 +182,22 @@ extension BrowserViewController: AddressBarDelegate, AddressBarGestureDelegate {
         browserChrome.showActionBar(.pageZoom, animated: true)
     }
     
+    func addressBarDidRequestFloatingWindow(_ addressBar: AddressBar) {
+        toggleFloatingWindow()
+    }
+    
+    func addressBarDidRequestTranslatePage(_ addressBar: AddressBar) {
+        guard let tab = tabManager.selectedTab else {
+            return
+        }
+        
+        TranslateController.shared.toggleTranslation(for: tab)
+    }
+    
+    func addressBarIsFloatingWindowActive(_ addressBar: AddressBar) -> Bool {
+        return floatingWindowCoordinator.isFloating
+    }
+    
     func addressBarDidRequestWebsiteModeChange(_ addressBar: AddressBar) {
         guard tabManager.changeWebsiteModeForSelectedTab() else {
             return

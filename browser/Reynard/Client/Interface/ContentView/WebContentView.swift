@@ -219,6 +219,28 @@ final class WebContentView: UIView, UIScrollViewDelegate {
         updateRefreshIndicatorTint()
     }
     
+    /// Releases the engine view without closing the session, so another
+    /// `GeckoView` (for instance the floating window) can adopt it.
+    func detachSession() {
+        guard webView.session != nil else {
+            return
+        }
+        resetScrollTracking()
+        currentScrollY = 0
+        refreshingSession = nil
+        pullToRefreshRecognizer?.cancelPull()
+        webView.session = nil
+    }
+    
+    /// Makes sure the engine view of the current session is embedded again.
+    func reattachSession() {
+        guard let session = webView.session else {
+            return
+        }
+        webView.session = nil
+        webView.session = session
+    }
+    
     func resetScrollTracking() {
         lastScrollState = nil
         awaitsScrollInteraction = true

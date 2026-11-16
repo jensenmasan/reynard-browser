@@ -32,6 +32,7 @@ extension BrowserViewController: TabManagerDelegate {
         updateBrowserLayout(animated: animateTabBarVisibility)
         homepageOverlayCoordinator.updatePresentation(animated: false)
         tabBar.updateLayout()
+        floatingWindowCoordinator.handleTabsChanged()
     }
     
     func tabManagerDidTerminateSelectedTab(_ tabManager: TabManager) {
@@ -162,6 +163,7 @@ extension BrowserViewController: TabManagerDelegate {
         
         switch reason {
         case .title:
+            floatingWindowCoordinator.updateTitleIfNeeded(for: tab)
             if index == tabManager.selectedTabIndex {
                 refreshAddressBar()
             }

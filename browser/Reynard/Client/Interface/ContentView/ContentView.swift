@@ -571,6 +571,24 @@ final class ContentView: UIView, UIGestureRecognizerDelegate {
         webContentView.isDisplaying(session: session)
     }
     
+    /// Releases the engine view of the displayed page without tearing the session down.
+    /// Used when a page is moved into the floating window.
+    func detachDisplayedSession() {
+        resetHistoryNavigation()
+        session = nil
+        resetFocusedInputRelocation()
+        webContentView.detachSession()
+        onAppearanceChanged?()
+        updateToolbarLayout()
+        updatePullToRefreshAvailability()
+    }
+    
+    /// Re-adopts the engine view of the displayed page, for example after the page
+    /// comes back from the floating window.
+    func reattachDisplayedSession() {
+        webContentView.reattachSession()
+    }
+    
     func restoreInteraction(for session: GeckoSession) {
         webContentView.restoreInteraction(for: session)
     }
