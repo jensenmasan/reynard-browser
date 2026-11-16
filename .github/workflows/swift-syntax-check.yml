@@ -34,10 +34,29 @@ jobs:
           echo "Parsed $count Swift files."
           exit $fail
 
-      - name: Check JavaScript sources
+  javascript:
+    name: Check JavaScript sources
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Check bundled add-on scripts
+        shell: bash
         run: |
           set -e
-          for file in $(find extensions -name '*.js'); do
+          find extensions -name '*.js' > /tmp/files.txt
+          while IFS= read -r file; do
             node --check "$file"
             echo "OK $file"
-          done
+          done < /tmp/files.txt
+
+      - name: Validate add-on manifests
+        shell: bash
+        run: |
+          set -e
+          find extensions -name 'manifest.json' > /tmp/manifests.txt
+          while IFS= read -r file; do
+            node -e "JSON.parse(require('fs').readFileSync(process.argv[1], 'utf8'))" "$file"
+            echo "OK $file"
+          done < /tmp/manifests.txt
