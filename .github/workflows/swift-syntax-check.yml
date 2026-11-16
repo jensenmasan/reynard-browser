@@ -17,10 +17,12 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Parse Swift files
+        shell: bash
         run: |
           set -e
           fail=0
           count=0
+          find browser extensions -name '*.swift' > /tmp/files.txt
           while IFS= read -r file; do
             count=$((count + 1))
             if ! swiftc -parse "$file" 2>/tmp/err.txt; then
@@ -28,7 +30,7 @@ jobs:
               cat /tmp/err.txt
               fail=1
             fi
-          done < <(find browser extensions -name '*.swift')
+          done < /tmp/files.txt
           echo "Parsed $count Swift files."
           exit $fail
 

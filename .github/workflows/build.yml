@@ -126,6 +126,17 @@ jobs:
         with:
           targets: aarch64-apple-ios
 
+      - name: Prefer rustup-managed toolchain over Homebrew shims
+        run: |
+          # Recent macOS runner images ship a Homebrew "rustup" whose bin dir wins
+          # over ~/.cargo/bin. Its rustup entry is actually a rustc symlink, so
+          # mach's `rustup which rustc` becomes `rustc which rustc` and configure
+          # dies with "multiple input filenames provided".
+          filtered=$(printf '%s' "$PATH" | tr ':' '\n' | grep -v '^/opt/homebrew/opt/rustup/bin$' | paste -sd ':' -)
+          echo "PATH=$HOME/.cargo/bin:$filtered" >> "$GITHUB_ENV"
+          echo "which rustc: $(command -v rustc)"
+          rustup which rustc
+
       - name: Hash Rust toolchain for cache
         id: rust_toolchain
         run: echo "hash=$(rustc -Vv | shasum -a 256 | cut -d ' ' -f 1)" >> "$GITHUB_OUTPUT"
