@@ -586,7 +586,13 @@ final class ContentView: UIView, UIGestureRecognizerDelegate {
     /// Re-adopts the engine view of the displayed page, for example after the page
     /// comes back from the floating window.
     func reattachDisplayedSession() {
-        webContentView.reattachSession()
+        guard let session = webContentView.reattachSession() else {
+            return
+        }
+        self.session = session
+        onAppearanceChanged?()
+        updateToolbarLayout()
+        updatePullToRefreshAvailability()
     }
     
     func restoreInteraction(for session: GeckoSession) {

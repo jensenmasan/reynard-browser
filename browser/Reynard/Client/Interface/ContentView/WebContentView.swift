@@ -41,6 +41,9 @@ final class WebContentView: UIView, UIScrollViewDelegate {
     private var pageBackgroundBottomConstraint: NSLayoutConstraint?
     
     private let webView = GeckoView()
+    /// Session whose engine view was handed to another container (e.g. the
+    /// floating window) and can be adopted again later.
+    private var detachedSession: GeckoSession?
     private let pageBackgroundView = UIView()
     private let errorLabel = UILabel()
     private let scrollToTopTriggerView = UIScrollView() // For scrolling up when tap the iOS status bar
@@ -211,6 +214,8 @@ final class WebContentView: UIView, UIScrollViewDelegate {
         currentScrollY = 0
         refreshingSession = nil
         pullToRefreshRecognizer?.cancelPull()
+        // Showing a tab always wins over a pending re-attach request.
+        detachedSession = nil
         webView.session = tab?.session
     }
     
@@ -222,9 +227,10 @@ final class WebContentView: UIView, UIScrollViewDelegate {
     /// Releases the engine view without closing the session, so another
     /// `GeckoView` (for instance the floating window) can adopt it.
     func detachSession() {
-        guard webView.session != nil else {
+        guard let session = webView.session else {
             return
         }
+        detachedSession = session
         resetScrollTracking()
         currentScrollY = 0
         refreshingSession = nil
@@ -232,13 +238,15 @@ final class WebContentView: UIView, UIScrollViewDelegate {
         webView.session = nil
     }
     
-    /// Makes sure the engine view of the current session is embedded again.
-    func reattachSession() {
-        guard let session = webView.session else {
-            return
+    /// Makes sure the engine view of the previously detached session is embedded again.
+    @discardableResult
+    func reattachSession() -> GeckoSession? {
+        guard let session = detachedSession else {
+            return nil
         }
-        webView.session = nil
+        detachedSession = nil
         webView.session = session
+        return session
     }
     
     func resetScrollTracking() {

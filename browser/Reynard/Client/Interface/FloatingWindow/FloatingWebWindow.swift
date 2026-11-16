@@ -10,7 +10,7 @@
 import GeckoView
 import UIKit
 
-final class FloatingWebWindow: UIView, UIGestureRecognizerDelegate {
+final class FloatingWebWindow: UIView {
     private enum UX {
         static let cornerRadius: CGFloat = 18
         static let headerHeight: CGFloat = 34
@@ -168,11 +168,9 @@ final class FloatingWebWindow: UIView, UIGestureRecognizerDelegate {
     
     private func configureGestures() {
         let movePan = UIPanGestureRecognizer(target: self, action: #selector(handleMovePan(_:)))
-        movePan.delegate = self
         headerBar.addGestureRecognizer(movePan)
         
         let resizePan = UIPanGestureRecognizer(target: self, action: #selector(handleResizePan(_:)))
-        resizePan.delegate = self
         gripView.addGestureRecognizer(resizePan)
         
         let doubleTap = UITapGestureRecognizer(target: self, action: #selector(handleExpand))
@@ -264,15 +262,5 @@ final class FloatingWebWindow: UIView, UIGestureRecognizerDelegate {
     
     @objc private func handleClose() {
         onClose?()
-    }
-    
-    // MARK: - UIGestureRecognizerDelegate
-    
-    override func gestureRecognizerShouldBegin(_ gestureRecognizer: UIGestureRecognizer) -> Bool {
-        if let pan = gestureRecognizer as? UIPanGestureRecognizer, pan.view === headerBar {
-            let velocity = pan.velocity(in: headerBar)
-            return abs(velocity.x) > abs(velocity.y) || abs(velocity.y) > 6
-        }
-        return true
     }
 }

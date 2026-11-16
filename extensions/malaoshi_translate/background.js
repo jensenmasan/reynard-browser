@@ -19,15 +19,31 @@ const DEFAULT_SETTINGS = {
 
 // ---------------------------------------------------------------- 入口绑定
 
+// 工具栏按钮优先绑定：即使 menus 接口在 GeckoView 上缺失，也不影响按钮入口。
+if (browser.browserAction && browser.browserAction.onClicked) {
+  browser.browserAction.onClicked.addListener((tab) => {
+    sendToggle(tab);
+  });
+}
+
+const hasMenus = Boolean(browser.menus && browser.menus.onClicked);
+
 function ensureMenu() {
-  browser.menus.create(
-    {
-      id: MENU_ID,
-      title: '沉浸式翻译此页',
-      contexts: ['page', 'selection'],
-    },
-    () => void browser.runtime.lastError
-  );
+  if (!hasMenus) {
+    return;
+  }
+  try {
+    browser.menus.create(
+      {
+        id: MENU_ID,
+        title: '沉浸式翻译此页',
+        contexts: ['page', 'selection'],
+      },
+      () => void browser.runtime.lastError
+    );
+  } catch (error) {
+    // menus 不可用时静默降级，右键入口缺失但工具栏按钮依旧可用。
+  }
 }
 
 browser.runtime.onInstalled.addListener(ensureMenu);
@@ -43,15 +59,13 @@ function sendToggle(tab) {
   });
 }
 
-browser.menus.onClicked.addListener((info, tab) => {
-  if (info.menuItemId === MENU_ID) {
-    sendToggle(tab);
-  }
-});
-
-browser.browserAction.onClicked.addListener((tab) => {
-  sendToggle(tab);
-});
+if (hasMenus) {
+  browser.menus.onClicked.addListener((info, tab) => {
+    if (info.menuItemId === MENU_ID) {
+      sendToggle(tab);
+    }
+  });
+}
 
 // ---------------------------------------------------------------- 设置读写
 
